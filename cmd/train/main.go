@@ -142,6 +142,7 @@ func loadTrainingData(datasetPath string) ([]nn.Sample, []nn.Sample, []nn.Sample
 			{X: []float64{0, 0}, Y: 0},
 			{X: []float64{0, 1}, Y: 1},
 			{X: []float64{1, 0}, Y: 1},
+			{X: []float64{1, 1}, Y: 1},
 		}
 
 		return samples, samples, samples, 2, 0.1, "results/or_synthetic.csv"
