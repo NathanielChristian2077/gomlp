@@ -1,0 +1,31 @@
+train=300 validation=100 test=100 input=4096 hidden=128 epochs=100 batch=16 lr=0.001000 out=results/baseline_dense_h128_b16_lr001/seed_1.csv
+train: total=300 cat=150 dog=150
+validation: total=100 cat=50 dog=50
+test: total=100 cat=50 dog=50
+epoch=1 train_loss=0.696102 train_acc=0.49 val_loss=0.707116 val_acc=0.49
+epoch=10 train_loss=0.664136 train_acc=0.61 val_loss=0.693523 val_acc=0.51
+epoch=20 train_loss=0.644416 train_acc=0.68 val_loss=0.691325 val_acc=0.61
+epoch=30 train_loss=0.627007 train_acc=0.71 val_loss=0.691417 val_acc=0.61
+epoch=40 train_loss=0.612953 train_acc=0.72 val_loss=0.692421 val_acc=0.51
+epoch=50 train_loss=0.599645 train_acc=0.74 val_loss=0.693341 val_acc=0.53
+epoch=60 train_loss=0.586217 train_acc=0.76 val_loss=0.695348 val_acc=0.54
+epoch=70 train_loss=0.567175 train_acc=0.81 val_loss=0.692250 val_acc=0.54
+epoch=80 train_loss=0.558892 train_acc=0.77 val_loss=0.698708 val_acc=0.52
+epoch=90 train_loss=0.540357 train_acc=0.82 val_loss=0.693195 val_acc=0.55
+epoch=100 train_loss=0.531816 train_acc=0.81 val_loss=0.698973 val_acc=0.52
+selected_epoch=20 selected_val_loss=0.691325 selected_val_acc=0.61
+test_loss=0.698590 test_acc=0.50 precision=0.50 recall=0.60 f1=0.55
+confusion_matrix:
+TN=20 FP=30
+FN=20 TP=30
+predictions:
+i=0 y=0 yHat=0.478447
+i=1 y=0 yHat=0.489855
+i=2 y=0 yHat=0.513934
+i=3 y=0 yHat=0.531051
+i=4 y=0 yHat=0.474638
+i=5 y=0 yHat=0.452938
+i=6 y=0 yHat=0.453778
+i=7 y=0 yHat=0.475970
+i=8 y=0 yHat=0.524817
+i=9 y=0 yHat=0.559767
