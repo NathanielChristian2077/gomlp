@@ -2,6 +2,7 @@ package nn
 
 import (
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/NathanielChristian2077/gomlp/metrics"
@@ -22,31 +23,51 @@ type EpochResult struct {
 }
 
 func TrainEpoch(model *MLP, samples []Sample, lr float64) (EpochResult, error) {
+	return TrainEpochMiniBatch(model, samples, lr, len(samples), nil)
+}
+
+func TrainEpochMiniBatch(model *MLP, samples []Sample, lr float64, batchSize int, rng *rand.Rand) (EpochResult, error) {
 	if err := validateTrainingInput(model, samples); err != nil {
 		return EpochResult{}, err
 	}
-
-	startedAt := time.Now()
-	model.ZeroGrad()
-
-	loss := 0.0
-	confusion := metrics.NewConfusionMatrix()
-
-	for _, sample := range samples {
-		yHat := model.Forward(sample.X)
-		loss += BinaryCrossEntropy(yHat, sample.Y)
-		confusion.Add(yHat, sample.Y, DefaultClassificationThreshold)
-		model.Backward(sample.X, yHat, sample.Y)
+	if batchSize <= 0 {
+		return EpochResult{}, fmt.Errorf("invalid batch size: %d", batchSize)
 	}
 
-	model.ApplyGrad(lr, len(samples))
+	startedAt := time.Now()
+	work := samples
 
-	return EpochResult{
-		Loss:      loss / float64(len(samples)),
-		Accuracy:  confusion.Accuracy(),
-		Confusion: confusion,
-		Duration:  time.Since(startedAt),
-	}, nil
+	if rng != nil {
+		work = append([]Sample(nil), samples...)
+		rng.Shuffle(len(work), func(i, j int) {
+			work[i], work[j] = work[j], work[i]
+		})
+	}
+
+	for start := 0; start < len(work); start += batchSize {
+		end := start + batchSize
+		if end > len(work) {
+			end = len(work)
+		}
+
+		batch := work[start:end]
+		model.ZeroGrad()
+
+		for _, sample := range batch {
+			yHat := model.Forward(sample.X)
+			model.Backward(sample.X, yHat, sample.Y)
+		}
+
+		model.ApplyGrad(lr, len(batch))
+	}
+
+	result, err := Evaluate(model, samples)
+	if err != nil {
+		return EpochResult{}, err
+	}
+
+	result.Duration = time.Since(startedAt)
+	return result, nil
 }
 
 func Evaluate(model *MLP, samples []Sample) (EpochResult, error) {
