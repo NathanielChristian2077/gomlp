@@ -1,6 +1,7 @@
 package nn
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 )
@@ -17,6 +18,13 @@ type DenseLayer struct {
 }
 
 func NewDenseLayer(in, out int, rng *rand.Rand) DenseLayer {
+	if in <= 0 || out <= 0 {
+		panic(fmt.Sprintf("invalid dense layer shape: in=%d, out=%d", in, out))
+	}
+	if rng == nil {
+		panic("nil random source")
+	}
+
 	w := make([]float64, in*out)
 	b := make([]float64, out)
 
@@ -37,6 +45,9 @@ func NewDenseLayer(in, out int, rng *rand.Rand) DenseLayer {
 }
 
 func (l *DenseLayer) Forward(input, output []float64) {
+	l.mustMatchInput(input, "forward input")
+	l.mustMatchOutput(output, "forward output")
+
 	copy(output, l.Biases)
 
 	for i := 0; i < l.In; i++ {
@@ -59,6 +70,9 @@ func (l *DenseLayer) ZeroGrad() {
 }
 
 func (l *DenseLayer) AccumulateGrad(input []float64, deltaOut []float64) {
+	l.mustMatchInput(input, "gradient input")
+	l.mustMatchOutput(deltaOut, "gradient delta")
+
 	for o := 0; o < l.Out; o++ {
 		l.GradB[o] += deltaOut[o]
 	}
@@ -74,6 +88,10 @@ func (l *DenseLayer) AccumulateGrad(input []float64, deltaOut []float64) {
 }
 
 func (l *DenseLayer) ApplyGrad(lr float64, batchSize int) {
+	if batchSize <= 0 {
+		panic(fmt.Sprintf("invalid batch size: %d", batchSize))
+	}
+
 	scale := lr / float64(batchSize)
 
 	for i := range l.Weights {
@@ -82,5 +100,17 @@ func (l *DenseLayer) ApplyGrad(lr float64, batchSize int) {
 
 	for i := range l.Biases {
 		l.Biases[i] -= scale * l.GradB[i]
+	}
+}
+
+func (l *DenseLayer) mustMatchInput(values []float64, name string) {
+	if len(values) != l.In {
+		panic(fmt.Sprintf("invalid %s length: expected %d, got %d", name, l.In, len(values)))
+	}
+}
+
+func (l *DenseLayer) mustMatchOutput(values []float64, name string) {
+	if len(values) != l.Out {
+		panic(fmt.Sprintf("invalid %s length: expected %d, got %d", name, l.Out, len(values)))
 	}
 }
