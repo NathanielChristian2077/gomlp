@@ -1,3 +1,3 @@
-module github.com/NathanielChristian2077/gomlp.git
+module github.com/NathanielChristian2077/gomlp
 
 go 1.26.4

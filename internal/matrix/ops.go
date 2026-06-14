@@ -72,7 +72,7 @@ func Apply(a Matrix, fn func(float64) float64) Matrix {
 }
 
 func Transpose(a Matrix) Matrix {
-	out := New(a.Rows, a.Cols)
+	out := New(a.Cols, a.Rows)
 
 	for r := 0; r < a.Rows; r++ {
 		for c := 0; c < a.Cols; c++ {

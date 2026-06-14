@@ -1,6 +1,6 @@
 package nn
 
-import "github.com/NathanielChristian2077/gomlp.git/internal/matrix"
+import "github.com/NathanielChristian2077/gomlp/internal/matrix"
 
 type MLP struct {
 	W1 matrix.Matrix
