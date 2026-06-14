@@ -19,12 +19,15 @@ const (
 	DogLabel = 1.0
 )
 
+// Dataset agrupa os três splits usados no experimento.
+// Train atualiza pesos, Validation escolhe checkpoint e Test mede o resultado final.
 type Dataset struct {
 	Train      []nn.Sample
 	Validation []nn.Sample
 	Test       []nn.Sample
 }
 
+// LoadDataset carrega train, validation e test a partir da raiz do dataset.
 func LoadDataset(root string) (Dataset, error) {
 	train, err := LoadSplit(root, TrainSplit)
 	if err != nil {
@@ -48,6 +51,7 @@ func LoadDataset(root string) (Dataset, error) {
 	}, nil
 }
 
+// LoadSplit carrega as pastas cat e dog de um split específico.
 func LoadSplit(root string, split string) ([]nn.Sample, error) {
 	if root == "" {
 		return nil, fmt.Errorf("empty dataset root")
