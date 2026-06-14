@@ -10,7 +10,7 @@ type DenseLayer struct {
 	In  int
 	Out int
 
-	Weights []float64 // W[input][output] -> já explico...
+	Weights []float64
 	Biases  []float64
 
 	GradW []float64
@@ -41,6 +41,17 @@ func NewDenseLayer(in, out int, rng *rand.Rand) DenseLayer {
 		Biases:  b,
 		GradW:   make([]float64, in*out),
 		GradB:   make([]float64, out),
+	}
+}
+
+func (l DenseLayer) Clone() DenseLayer {
+	return DenseLayer{
+		In:      l.In,
+		Out:     l.Out,
+		Weights: cloneFloat64Slice(l.Weights),
+		Biases:  cloneFloat64Slice(l.Biases),
+		GradW:   cloneFloat64Slice(l.GradW),
+		GradB:   cloneFloat64Slice(l.GradB),
 	}
 }
 
@@ -113,4 +124,10 @@ func (l *DenseLayer) mustMatchOutput(values []float64, name string) {
 	if len(values) != l.Out {
 		panic(fmt.Sprintf("invalid %s length: expected %d, got %d", name, l.Out, len(values)))
 	}
+}
+
+func cloneFloat64Slice(values []float64) []float64 {
+	out := make([]float64, len(values))
+	copy(out, values)
+	return out
 }
