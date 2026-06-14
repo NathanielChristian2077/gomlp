@@ -8,13 +8,17 @@ import (
 	"github.com/NathanielChristian2077/gomlp/metrics"
 )
 
+// DefaultClassificationThreshold converte a saída sigmoid em classe binária.
 const DefaultClassificationThreshold = 0.5
 
+// Sample representa uma amostra supervisionada da MLP.
+// X é o vetor de entrada e Y é o rótulo: 0 para gato, 1 para cachorro.
 type Sample struct {
 	X []float64
 	Y float64
 }
 
+// EpochResult concentra as métricas produzidas por treino ou avaliação.
 type EpochResult struct {
 	Loss      float64
 	Accuracy  float64
@@ -22,10 +26,12 @@ type EpochResult struct {
 	Duration  time.Duration
 }
 
+// TrainEpoch executa uma época em full-batch.
 func TrainEpoch(model *MLP, samples []Sample, lr float64) (EpochResult, error) {
 	return TrainEpochMiniBatch(model, samples, lr, len(samples), nil)
 }
 
+// TrainEpochMiniBatch executa treino por mini-batch com shuffle opcional.
 func TrainEpochMiniBatch(model *MLP, samples []Sample, lr float64, batchSize int, rng *rand.Rand) (EpochResult, error) {
 	if err := validateTrainingInput(model, samples); err != nil {
 		return EpochResult{}, err
@@ -70,6 +76,7 @@ func TrainEpochMiniBatch(model *MLP, samples []Sample, lr float64, batchSize int
 	return result, nil
 }
 
+// Evaluate calcula métricas sem alterar os pesos da rede.
 func Evaluate(model *MLP, samples []Sample) (EpochResult, error) {
 	if err := validateTrainingInput(model, samples); err != nil {
 		return EpochResult{}, err
