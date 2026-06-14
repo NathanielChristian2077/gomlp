@@ -57,6 +57,10 @@ func main() {
 	printClassBalance("validation", validationSamples)
 	printClassBalance("test", testSamples)
 
+	var bestModel *nn.MLP
+	var bestEpoch int
+	var bestValidationResult nn.EpochResult
+
 	for epoch := 1; epoch <= *epochs; epoch++ {
 		trainResult, err := nn.TrainEpochMiniBatch(model, trainSamples, lr, batch, rng)
 		if err != nil {
@@ -66,6 +70,12 @@ func main() {
 		validationResult, err := nn.Evaluate(model, validationSamples)
 		if err != nil {
 			log.Fatal(err)
+		}
+
+		if bestModel == nil || isBetterValidation(validationResult, bestValidationResult) {
+			bestModel = model.Clone()
+			bestEpoch = epoch
+			bestValidationResult = validationResult
 		}
 
 		if err := logger.WriteEpoch(
@@ -91,7 +101,20 @@ func main() {
 		}
 	}
 
-	testResult, err := nn.Evaluate(model, testSamples)
+	if bestModel == nil {
+		validationResult, err := nn.Evaluate(model, validationSamples)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		bestModel = model.Clone()
+		bestEpoch = 0
+		bestValidationResult = validationResult
+	}
+
+	fmt.Printf("selected_epoch=%d selected_val_loss=%.6f selected_val_acc=%.2f\n", bestEpoch, bestValidationResult.Loss, bestValidationResult.Accuracy)
+
+	testResult, err := nn.Evaluate(bestModel, testSamples)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -108,7 +131,7 @@ func main() {
 
 	for i := 0; i < limit; i++ {
 		sample := testSamples[i]
-		yHat := model.Forward(sample.X)
+		yHat := bestModel.Forward(sample.X)
 		fmt.Printf("i=%d y=%.0f yHat=%.6f\n", i, sample.Y, yHat)
 	}
 }
@@ -119,7 +142,6 @@ func loadTrainingData(datasetPath string) ([]nn.Sample, []nn.Sample, []nn.Sample
 			{X: []float64{0, 0}, Y: 0},
 			{X: []float64{0, 1}, Y: 1},
 			{X: []float64{1, 0}, Y: 1},
-			{X: []float64{1, 1}, Y: 1},
 		}
 
 		return samples, samples, samples, 2, 0.1, "results/or_synthetic.csv"
@@ -141,6 +163,13 @@ func loadTrainingData(datasetPath string) ([]nn.Sample, []nn.Sample, []nn.Sample
 	}
 
 	return dataset.Train, dataset.Validation, dataset.Test, len(dataset.Train[0].X), 0.001, "results/dataset_train.csv"
+}
+
+func isBetterValidation(candidate, current nn.EpochResult) bool {
+	if candidate.Accuracy != current.Accuracy {
+		return candidate.Accuracy > current.Accuracy
+	}
+	return candidate.Loss < current.Loss
 }
 
 func shouldLog(epoch, epochs, logEvery int) bool {
