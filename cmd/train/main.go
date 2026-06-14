@@ -12,6 +12,7 @@ import (
 )
 
 func main() {
+	// Flags permitem repetir experimentos alterando hiperparâmetros sem modificar o código.
 	datasetPath := flag.String("dataset", "", "dataset root with train, validation and test folders")
 	epochs := flag.Int("epochs", 3000, "number of training epochs")
 	hiddenSize := flag.Int("hidden", 128, "hidden layer size")
@@ -39,6 +40,7 @@ func main() {
 		batch = len(trainSamples)
 	}
 
+	// A seed controla tanto a inicialização dos pesos quanto o shuffle do treino.
 	model := nn.NewMLP(inputSize, *hiddenSize, *seed)
 	rng := rand.New(rand.NewSource(*seed + 1))
 
@@ -72,6 +74,8 @@ func main() {
 			log.Fatal(err)
 		}
 
+		// Guarda uma cópia do melhor modelo visto em validação.
+		// O teste final será feito nesse checkpoint, não necessariamente na última época.
 		if bestModel == nil || isBetterValidation(validationResult, bestValidationResult) {
 			bestModel = model.Clone()
 			bestEpoch = epoch
