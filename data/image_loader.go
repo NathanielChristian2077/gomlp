@@ -14,10 +14,13 @@ const (
 	ImageSize   = ImageWidth * ImageHeight
 )
 
+// LoadImageVector carrega uma imagem usando o tamanho padrão da MLP: 64x64.
 func LoadImageVector(path string) ([]float64, error) {
 	return LoadImageVectorWithSize(path, ImageWidth, ImageHeight)
 }
 
+// LoadImageVectorWithSize abre a imagem, decodifica e transforma em vetor normalizado.
+// O vetor resultante é a entrada da MLP.
 func LoadImageVectorWithSize(path string, width, height int) ([]float64, error) {
 	if width <= 0 || height <= 0 {
 		return nil, fmt.Errorf("invalid target image size: %dx%d", width, height)
@@ -37,6 +40,8 @@ func LoadImageVectorWithSize(path string, width, height int) ([]float64, error) 
 	return ResizeToGrayVector(img, width, height), nil
 }
 
+// ResizeToGrayVector redimensiona por vizinho mais próximo, converte para grayscale
+// e normaliza cada pixel para o intervalo [0, 1].
 func ResizeToGrayVector(img image.Image, width, height int) []float64 {
 	bounds := img.Bounds()
 	sourceWidth := bounds.Dx()
