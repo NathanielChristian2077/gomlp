@@ -2,6 +2,8 @@ package nn
 
 import "math/rand"
 
+// MLP representa a arquitetura da baseline: entrada -> camada oculta -> saída.
+// A camada oculta usa ReLU e a saída usa sigmoid para classificação binária.
 type MLP struct {
 	Hidden DenseLayer
 	Output DenseLayer
@@ -14,6 +16,7 @@ type MLP struct {
 	DeltaOutput []float64
 }
 
+// NewMLP cria a rede com uma camada oculta e seed fixa para reprodutibilidade.
 func NewMLP(inputSize, hiddenSize int, seed int64) *MLP {
 	rng := rand.New(rand.NewSource(seed))
 
@@ -30,6 +33,7 @@ func NewMLP(inputSize, hiddenSize int, seed int64) *MLP {
 	}
 }
 
+// Clone copia o modelo para guardar o melhor checkpoint de validação.
 func (m *MLP) Clone() *MLP {
 	if m == nil {
 		return nil
@@ -48,6 +52,7 @@ func (m *MLP) Clone() *MLP {
 	}
 }
 
+// Forward calcula a saída da rede para uma amostra.
 func (m *MLP) Forward(x []float64) float64 {
 	m.Hidden.Forward(x, m.HiddenZ)
 
@@ -60,6 +65,8 @@ func (m *MLP) Forward(x []float64) float64 {
 	return Sigmoid(m.OutputZ[0])
 }
 
+// Backward acumula os gradientes de uma amostra.
+// Com sigmoid + Binary Cross Entropy, o delta da saída é yHat - y.
 func (m *MLP) Backward(x []float64, yHat, y float64) {
 	m.DeltaOutput[0] = yHat - y
 
@@ -73,11 +80,13 @@ func (m *MLP) Backward(x []float64, yHat, y float64) {
 	m.Hidden.AccumulateGrad(x, m.DeltaHidden)
 }
 
+// ZeroGrad zera gradientes antes de processar um novo batch.
 func (m *MLP) ZeroGrad() {
 	m.Hidden.ZeroGrad()
 	m.Output.ZeroGrad()
 }
 
+// ApplyGrad aplica a atualização de pesos após o batch.
 func (m *MLP) ApplyGrad(lr float64, batchSize int) {
 	m.Hidden.ApplyGrad(lr, batchSize)
 	m.Output.ApplyGrad(lr, batchSize)
