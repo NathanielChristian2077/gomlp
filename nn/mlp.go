@@ -30,6 +30,24 @@ func NewMLP(inputSize, hiddenSize int, seed int64) *MLP {
 	}
 }
 
+func (m *MLP) Clone() *MLP {
+	if m == nil {
+		return nil
+	}
+
+	return &MLP{
+		Hidden: m.Hidden.Clone(),
+		Output: m.Output.Clone(),
+
+		HiddenZ: cloneFloat64Slice(m.HiddenZ),
+		HiddenA: cloneFloat64Slice(m.HiddenA),
+		OutputZ: cloneFloat64Slice(m.OutputZ),
+
+		DeltaHidden: cloneFloat64Slice(m.DeltaHidden),
+		DeltaOutput: cloneFloat64Slice(m.DeltaOutput),
+	}
+}
+
 func (m *MLP) Forward(x []float64) float64 {
 	m.Hidden.Forward(x, m.HiddenZ)
 
@@ -43,14 +61,12 @@ func (m *MLP) Forward(x []float64) float64 {
 }
 
 func (m *MLP) Backward(x []float64, yHat, y float64) {
-	// Sigmoid + BCE simplifica:
-	// delta = yHat - y
 	m.DeltaOutput[0] = yHat - y
 
 	m.Output.AccumulateGrad(m.HiddenA, m.DeltaOutput)
 
 	for i := 0; i < m.Hidden.Out; i++ {
-		w := m.Output.Weights[i*m.Output.Out] // Out = 1
+		w := m.Output.Weights[i*m.Output.Out]
 		m.DeltaHidden[i] = w * m.DeltaOutput[0] * ReLUDerivativeFromActivation(m.HiddenA[i])
 	}
 
