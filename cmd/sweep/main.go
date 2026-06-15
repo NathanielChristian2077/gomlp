@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/csv"
 	"flag"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -92,6 +95,59 @@ func main() {
 			result.RunDirectory,
 		)
 	}
+
+	if err := writeSweepSummary(filepath.Join(*outputRoot, "summary.csv"), results); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("summary=%s\n", filepath.Join(*outputRoot, "summary.csv"))
+}
+
+func writeSweepSummary(path string, results []experiment.RunResult) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	if err := writer.Write([]string{"run_id", "name", "completed", "cached", "best_epoch", "val_loss", "val_accuracy", "test_loss", "test_accuracy", "test_precision", "test_recall", "test_f1", "train_time_ms", "run_directory", "error"}); err != nil {
+		return err
+	}
+
+	for _, result := range results {
+		row := []string{
+			result.RunID,
+			result.Name,
+			strconv.FormatBool(result.Completed),
+			strconv.FormatBool(result.LoadedFromSummary),
+			strconv.Itoa(result.BestEpoch),
+			formatFloat(result.BestValidationLoss),
+			formatFloat(result.BestValidationAccuracy),
+			formatFloat(result.TestLoss),
+			formatFloat(result.TestAccuracy),
+			formatFloat(result.TestPrecision),
+			formatFloat(result.TestRecall),
+			formatFloat(result.TestF1),
+			strconv.FormatInt(result.TrainTimeMilliseconds, 10),
+			result.RunDirectory,
+			result.Error,
+		}
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+
+	return writer.Error()
+}
+
+func formatFloat(value float64) string {
+	return strconv.FormatFloat(value, 'f', 8, 64)
 }
 
 func parseInts(raw string) ([]int, error) {
