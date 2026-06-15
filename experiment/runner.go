@@ -1,6 +1,7 @@
 package experiment
 
 import (
+	"encoding/csv"
 	"fmt"
 	"math/rand"
 	"os"
@@ -67,6 +68,10 @@ func RunExperiments(configs []RunConfig, dataset DatasetBundle, maxWorkers int) 
 
 func RunOrLoadExperiment(config RunConfig, dataset DatasetBundle) RunResult {
 	config = config.Normalize(dataset.DefaultLearningRate)
+	if err := config.Validate(); err != nil {
+		return failedResult(config, "", "", err)
+	}
+
 	runID, err := config.ID()
 	if err != nil {
 		return failedResult(config, "", "", err)
@@ -191,6 +196,9 @@ func RunOrLoadExperiment(config RunConfig, dataset DatasetBundle) RunResult {
 	if err := writeConfusionMatrixCSV(filepath.Join(runDir, "confusion_matrix.csv"), testResult.Confusion); err != nil {
 		return failedResult(config, runID, runDir, err)
 	}
+	if err := writePredictionsCSV(filepath.Join(runDir, "test_predictions.csv"), bestModel, dataset.Test); err != nil {
+		return failedResult(config, runID, runDir, err)
+	}
 	if err := writeJSONAtomic(summaryPath, result); err != nil {
 		return failedResult(config, runID, runDir, err)
 	}
@@ -243,4 +251,38 @@ func writeConfusionMatrixCSV(path string, matrix metrics.ConfusionMatrix) error 
 	}
 
 	return nil
+}
+
+func writePredictionsCSV(path string, model *nn.MLP, samples []nn.Sample) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	if err := writer.Write([]string{"index", "y", "y_hat", "predicted"}); err != nil {
+		return err
+	}
+
+	for i, sample := range samples {
+		yHat := model.Forward(sample.X)
+		row := []string{
+			fmt.Sprintf("%d", i),
+			fmt.Sprintf("%.0f", sample.Y),
+			fmt.Sprintf("%.8f", yHat),
+			fmt.Sprintf("%d", metrics.Classify(yHat, nn.DefaultClassificationThreshold)),
+		}
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+
+	return writer.Error()
 }
