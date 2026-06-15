@@ -48,8 +48,14 @@ func NewEpochCSVLogger(path string) (*CSVLogger, error) {
 		"epoch",
 		"train_loss",
 		"train_accuracy",
+		"train_precision",
+		"train_recall",
+		"train_f1",
 		"val_loss",
 		"val_accuracy",
+		"val_precision",
+		"val_recall",
+		"val_f1",
 		"epoch_time_ms",
 	})
 }
@@ -68,12 +74,48 @@ func (l *CSVLogger) WriteRow(values ...string) error {
 }
 
 func (l *CSVLogger) WriteEpoch(epoch int, trainLoss, trainAccuracy, valLoss, valAccuracy float64, epochTimeMS int64) error {
+	return l.WriteEpochDetailed(
+		epoch,
+		trainLoss,
+		trainAccuracy,
+		0,
+		0,
+		0,
+		valLoss,
+		valAccuracy,
+		0,
+		0,
+		0,
+		epochTimeMS,
+	)
+}
+
+func (l *CSVLogger) WriteEpochDetailed(
+	epoch int,
+	trainLoss float64,
+	trainAccuracy float64,
+	trainPrecision float64,
+	trainRecall float64,
+	trainF1 float64,
+	valLoss float64,
+	valAccuracy float64,
+	valPrecision float64,
+	valRecall float64,
+	valF1 float64,
+	epochTimeMS int64,
+) error {
 	return l.WriteRow(
 		strconv.Itoa(epoch),
-		strconv.FormatFloat(trainLoss, 'f', 8, 64),
-		strconv.FormatFloat(trainAccuracy, 'f', 8, 64),
-		strconv.FormatFloat(valLoss, 'f', 8, 64),
-		strconv.FormatFloat(valAccuracy, 'f', 8, 64),
+		formatFloat(trainLoss),
+		formatFloat(trainAccuracy),
+		formatFloat(trainPrecision),
+		formatFloat(trainRecall),
+		formatFloat(trainF1),
+		formatFloat(valLoss),
+		formatFloat(valAccuracy),
+		formatFloat(valPrecision),
+		formatFloat(valRecall),
+		formatFloat(valF1),
 		strconv.FormatInt(epochTimeMS, 10),
 	)
 }
@@ -96,4 +138,8 @@ func (l *CSVLogger) Close() error {
 	}
 
 	return l.file.Close()
+}
+
+func formatFloat(value float64) string {
+	return strconv.FormatFloat(value, 'f', 8, 64)
 }
