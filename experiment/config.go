@@ -10,10 +10,8 @@ import (
 	"unicode"
 )
 
-// RunConfig descreve uma execução treinável da MLP baseline atual.
-// HiddenSizes permite comparar profundidade de forma real, em vez de trocar só
-// o tamanho de uma camada e fingir que isso é arquitetura profunda. Pequena vitória
-// contra a dramaturgia dos hiperparâmetros.
+// RunConfig descreve uma execução treinável da MLP.
+// HiddenSizes permite avaliar arquiteturas com uma ou mais camadas ocultas.
 type RunConfig struct {
 	Name         string  `json:"name"`
 	DatasetPath  string  `json:"dataset_path"`
@@ -35,6 +33,7 @@ type runFingerprint struct {
 	LearningRate float64 `json:"learning_rate"`
 }
 
+// Normalize aplica apenas defaults seguros e preserva valores inválidos para Validate reportar.
 func (c RunConfig) Normalize(defaultLearningRate float64) RunConfig {
 	out := c
 	if len(out.HiddenSizes) == 0 {
@@ -42,30 +41,40 @@ func (c RunConfig) Normalize(defaultLearningRate float64) RunConfig {
 	} else {
 		out.HiddenSizes = cloneIntSlice(out.HiddenSizes)
 	}
-	if out.Name == "" {
-		out.Name = fmt.Sprintf("dense_h%s_lr%g_bs%d_seed%d", hiddenSizesLabel(out.HiddenSizes), out.LearningRate, out.BatchSize, out.Seed)
-	}
-	if out.Epochs <= 0 {
-		out.Epochs = 1
-	}
-	for i, size := range out.HiddenSizes {
-		if size <= 0 {
-			out.HiddenSizes[i] = 128
-		}
+	if out.LearningRate < 0 {
+		out.LearningRate = defaultLearningRate
 	}
 	if out.Seed == 0 {
 		out.Seed = 42
 	}
-	if out.LearningRate < 0 {
-		out.LearningRate = defaultLearningRate
-	}
 	if out.OutputRoot == "" {
 		out.OutputRoot = "runs"
 	}
-	if out.LogEvery < 0 {
-		out.LogEvery = 0
+	if out.Name == "" {
+		out.Name = fmt.Sprintf("dense_h%s_lr%g_bs%d_seed%d", HiddenSizesLabel(out.HiddenSizes), out.LearningRate, out.BatchSize, out.Seed)
 	}
 	return out
+}
+
+func (c RunConfig) Validate() error {
+	if c.Epochs <= 0 {
+		return fmt.Errorf("epochs must be positive, got %d", c.Epochs)
+	}
+	if len(c.HiddenSizes) == 0 {
+		return fmt.Errorf("at least one hidden layer is required")
+	}
+	for i, size := range c.HiddenSizes {
+		if size <= 0 {
+			return fmt.Errorf("hidden layer %d size must be positive, got %d", i, size)
+		}
+	}
+	if c.LearningRate <= 0 {
+		return fmt.Errorf("learning rate must be positive, got %g", c.LearningRate)
+	}
+	if c.OutputRoot == "" {
+		return fmt.Errorf("output root cannot be empty")
+	}
+	return nil
 }
 
 func (c RunConfig) ID() (string, error) {
@@ -99,14 +108,6 @@ func (c RunConfig) RunDirectory() (string, error) {
 	}
 
 	return filepath.Join(c.OutputRoot, id+"_"+name), nil
-}
-
-func hiddenSizesLabel(hiddenSizes []int) string {
-	parts := make([]string, len(hiddenSizes))
-	for i, size := range hiddenSizes {
-		parts[i] = fmt.Sprintf("%d", size)
-	}
-	return strings.Join(parts, "x")
 }
 
 func sanitizeRunName(name string) string {
