@@ -104,13 +104,17 @@ func validateTrainingInput(model *MLP, samples []Sample) error {
 	if model == nil {
 		return fmt.Errorf("nil model")
 	}
+	if len(model.Hidden) == 0 {
+		return fmt.Errorf("model has no hidden layers")
+	}
 	if len(samples) == 0 {
 		return fmt.Errorf("empty sample set")
 	}
 
+	expectedInputSize := model.InputSize()
 	for i, sample := range samples {
-		if len(sample.X) != model.Hidden.In {
-			return fmt.Errorf("sample %d has invalid input length: expected %d, got %d", i, model.Hidden.In, len(sample.X))
+		if len(sample.X) != expectedInputSize {
+			return fmt.Errorf("sample %d has invalid input length: expected %d, got %d", i, expectedInputSize, len(sample.X))
 		}
 		if sample.Y != 0 && sample.Y != 1 {
 			return fmt.Errorf("sample %d has invalid label: expected 0 or 1, got %f", i, sample.Y)
