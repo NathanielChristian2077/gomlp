@@ -98,7 +98,7 @@ func RunOrLoadExperiment(config RunConfig, dataset DatasetBundle) RunResult {
 		batchSize = len(dataset.Train)
 	}
 
-	model := nn.NewMLP(dataset.InputSize, config.HiddenSize, config.Seed)
+	model := nn.NewMLPWithHiddenSizes(dataset.InputSize, config.HiddenSizes, config.Seed)
 	rng := rand.New(rand.NewSource(config.Seed + 1))
 
 	logger, err := metrics.NewEpochCSVLogger(filepath.Join(runDir, "metrics.csv"))
