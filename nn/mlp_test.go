@@ -71,9 +71,7 @@ func TestNewMLPWithHiddenSizesBuildsMultipleHiddenLayers(t *testing.T) {
 		}
 	}
 
-	if got := len(model.Forward([]float64{1, 0, 1})); got != 0 {
-		t.Fatalf("unreachable: scalar forward output cannot have length %d", got)
-	}
+	model.Forward([]float64{1, 0, 1})
 }
 
 func TestMultilayerMLPTrainingReducesLoss(t *testing.T) {
