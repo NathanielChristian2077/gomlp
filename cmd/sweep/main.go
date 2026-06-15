@@ -12,17 +12,17 @@ import (
 
 func main() {
 	datasetPath := flag.String("dataset", "", "dataset root with train, validation and test folders")
-	epochs := flag.Int("epochs", 3000, "number of epochs for each experiment")
-	hiddenArchitecturesRaw := flag.String("hidden", "128;256;256x64", "hidden architectures separated by semicolon; use x or - inside an architecture, e.g. 128;256x64;512-128")
-	batchValues := flag.String("batch", "32,64", "comma-separated batch sizes; use 0 for full-batch")
-	learningRateValues := flag.String("lr", "0.01,0.005,0.001", "comma-separated learning rates")
-	seedValues := flag.String("seeds", "42", "comma-separated seeds")
-	workers := flag.Int("workers", 2, "maximum number of CPU experiments running concurrently")
+	epochs := flag.Int("epochs", 100, "number of epochs for each experiment")
+	hiddenArchitecturesRaw := flag.String("hidden", "128;256;256x64", "hidden architectures separated by semicolon, e.g. 128;256x64;512-128")
+	batchValues := flag.String("batch", "16,32", "comma-separated batch sizes; use 0 for full-batch")
+	learningRateValues := flag.String("lr", "0.001,0.0003", "comma-separated learning rates")
+	seedValues := flag.String("seeds", "1,2,3,4,5,42", "comma-separated seeds")
+	workers := flag.Int("workers", 1, "maximum number of CPU experiments running concurrently")
 	outputRoot := flag.String("runs", "runs", "root directory for experiment outputs")
 	logEvery := flag.Int("log-every", 50, "reserved logging interval recorded in the config")
 	flag.Parse()
 
-	hiddenArchitectures, err := parseHiddenArchitectures(*hiddenArchitecturesRaw)
+	hiddenArchitectures, err := experiment.ParseHiddenArchitectures(*hiddenArchitecturesRaw)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func main() {
 		for _, batch := range batchSizes {
 			for _, lr := range learningRates {
 				for _, seed := range seeds {
-					name := fmt.Sprintf("dense_h%s_lr%g_bs%d_seed%d", hiddenLabel(hiddenSizes), lr, batch, seed)
+					name := fmt.Sprintf("dense_h%s_lr%g_bs%d_seed%d", experiment.HiddenSizesLabel(hiddenSizes), lr, batch, seed)
 					configs = append(configs, experiment.RunConfig{
 						Name:         name,
 						DatasetPath:  *datasetPath,
@@ -92,51 +92,6 @@ func main() {
 			result.RunDirectory,
 		)
 	}
-}
-
-func parseHiddenArchitectures(raw string) ([][]int, error) {
-	parts := strings.Split(raw, ";")
-	architectures := make([][]int, 0, len(parts))
-
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-
-		architecture, err := parseHiddenArchitecture(part)
-		if err != nil {
-			return nil, err
-		}
-		architectures = append(architectures, architecture)
-	}
-
-	if len(architectures) == 0 {
-		return nil, fmt.Errorf("empty hidden architecture list")
-	}
-	return architectures, nil
-}
-
-func parseHiddenArchitecture(raw string) ([]int, error) {
-	normalized := strings.NewReplacer("x", ",", "X", ",", "-", ",", ":", ",").Replace(raw)
-	values, err := parseInts(normalized)
-	if err != nil {
-		return nil, fmt.Errorf("invalid hidden architecture %q: %w", raw, err)
-	}
-	for _, value := range values {
-		if value <= 0 {
-			return nil, fmt.Errorf("invalid hidden architecture %q: layer size must be positive", raw)
-		}
-	}
-	return values, nil
-}
-
-func hiddenLabel(hiddenSizes []int) string {
-	parts := make([]string, len(hiddenSizes))
-	for i, size := range hiddenSizes {
-		parts[i] = strconv.Itoa(size)
-	}
-	return strings.Join(parts, "x")
 }
 
 func parseInts(raw string) ([]int, error) {
