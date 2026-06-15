@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/NathanielChristian2077/gomlp/data"
+	"github.com/NathanielChristian2077/gomlp/experiment"
 	"github.com/NathanielChristian2077/gomlp/metrics"
 	"github.com/NathanielChristian2077/gomlp/nn"
 )
@@ -26,7 +27,7 @@ type trainRunConfig struct {
 	RunName      string       `json:"run_name"`
 	DatasetPath  string       `json:"dataset_path"`
 	Epochs       int          `json:"epochs"`
-	HiddenSize   int          `json:"hidden_size"`
+	HiddenSizes  []int        `json:"hidden_sizes"`
 	BatchSize    int          `json:"batch_size"`
 	Seed         int64        `json:"seed"`
 	LearningRate float64      `json:"learning_rate"`
@@ -57,10 +58,9 @@ type trainRunSummary struct {
 }
 
 func main() {
-	// Flags permitem repetir experimentos alterando hiperparâmetros sem modificar o código.
 	datasetPath := flag.String("dataset", "", "dataset root with train, validation and test folders")
-	epochs := flag.Int("epochs", 3000, "number of training epochs")
-	hiddenSize := flag.Int("hidden", 128, "hidden layer size")
+	epochs := flag.Int("epochs", 100, "number of training epochs")
+	hiddenRaw := flag.String("hidden", "128", "hidden architecture, e.g. 128, 256x64 or 512-128")
 	batchSize := flag.Int("batch", 0, "mini-batch size; if <= 0, full-batch training is used")
 	seed := flag.Int64("seed", 42, "random seed")
 	learningRate := flag.Float64("lr", -1, "learning rate; if negative, a default is selected")
@@ -69,6 +69,11 @@ func main() {
 	runName := flag.String("name", "dense_baseline", "human-readable run name used in logs")
 	logEvery := flag.Int("log-every", 50, "print progress every N epochs")
 	flag.Parse()
+
+	hiddenSizes, err := experiment.ParseHiddenArchitecture(*hiddenRaw)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	trainSamples, validationSamples, testSamples, inputSize, defaultLR, defaultOutput := loadTrainingData(*datasetPath)
 
@@ -103,7 +108,7 @@ func main() {
 		RunName:      *runName,
 		DatasetPath:  *datasetPath,
 		Epochs:       *epochs,
-		HiddenSize:   *hiddenSize,
+		HiddenSizes:  append([]int(nil), hiddenSizes...),
 		BatchSize:    batch,
 		Seed:         *seed,
 		LearningRate: lr,
@@ -118,8 +123,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// A seed controla tanto a inicialização dos pesos quanto o shuffle do treino.
-	model := nn.NewMLP(inputSize, *hiddenSize, *seed)
+	model := nn.NewMLPWithHiddenSizes(inputSize, hiddenSizes, *seed)
 	rng := rand.New(rand.NewSource(*seed + 1))
 
 	logger, err := metrics.NewEpochCSVLogger(out)
@@ -133,7 +137,7 @@ func main() {
 	}()
 
 	fmt.Printf("run=%s run_dir=%s\n", *runName, runDir)
-	fmt.Printf("train=%d validation=%d test=%d input=%d hidden=%d epochs=%d batch=%d lr=%.6f out=%s\n", len(trainSamples), len(validationSamples), len(testSamples), inputSize, *hiddenSize, *epochs, batch, lr, out)
+	fmt.Printf("train=%d validation=%d test=%d input=%d hidden=%s epochs=%d batch=%d lr=%.6f out=%s\n", len(trainSamples), len(validationSamples), len(testSamples), inputSize, experiment.HiddenSizesLabel(hiddenSizes), *epochs, batch, lr, out)
 	printClassBalance("train", trainSamples)
 	printClassBalance("validation", validationSamples)
 	printClassBalance("test", testSamples)
@@ -154,8 +158,6 @@ func main() {
 			log.Fatal(err)
 		}
 
-		// Guarda uma cópia do melhor modelo visto em validação.
-		// O teste final será feito nesse checkpoint, não necessariamente na última época.
 		if bestModel == nil || isBetterValidation(validationResult, bestValidationResult) {
 			bestModel = model.Clone()
 			bestEpoch = epoch
