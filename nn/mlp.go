@@ -7,10 +7,7 @@ import (
 
 // MLP representa uma rede totalmente conectada manual:
 // entrada -> uma ou mais camadas ocultas ReLU -> saída sigmoid.
-//
-// Hidden é um slice para permitir comparar arquiteturas como 4096->128->1
-// contra 4096->256->64->1 sem reescrever o treino. Sim, finalmente a MLP
-// deixou de fingir que profundidade era só um número bonito no relatório.
+// Hidden é um slice para permitir comparar arquiteturas com diferentes profundidades.
 type MLP struct {
 	Hidden []DenseLayer
 	Output DenseLayer
@@ -23,12 +20,13 @@ type MLP struct {
 	DeltaOutput []float64
 }
 
-// NewMLP preserva a API antiga para a baseline de uma camada oculta.
+// NewMLP preserva a API da baseline original de uma camada oculta.
 func NewMLP(inputSize, hiddenSize int, seed int64) *MLP {
 	return NewMLPWithHiddenSizes(inputSize, []int{hiddenSize}, seed)
 }
 
-// NewMLPWithHiddenSizes cria a rede com N camadas ocultas e seed fixa para reprodutibilidade.
+// NewMLPWithHiddenSizes cria uma MLP com uma ou mais camadas ocultas.
+// O seed fixa a inicialização dos pesos para tornar os experimentos reproduzíveis.
 func NewMLPWithHiddenSizes(inputSize int, hiddenSizes []int, seed int64) *MLP {
 	if inputSize <= 0 {
 		panic(fmt.Sprintf("invalid input size: %d", inputSize))
