@@ -11,13 +11,14 @@ import (
 )
 
 // RunConfig descreve uma execução treinável da MLP baseline atual.
-// Nesta fase a arquitetura ainda usa uma camada oculta; quando o MLP virar N-camadas,
-// este tipo pode evoluir de HiddenSize para HiddenSizes sem quebrar o runner inteiro.
+// HiddenSizes permite comparar profundidade de forma real, em vez de trocar só
+// o tamanho de uma camada e fingir que isso é arquitetura profunda. Pequena vitória
+// contra a dramaturgia dos hiperparâmetros.
 type RunConfig struct {
 	Name         string  `json:"name"`
 	DatasetPath  string  `json:"dataset_path"`
 	Epochs       int     `json:"epochs"`
-	HiddenSize   int     `json:"hidden_size"`
+	HiddenSizes  []int   `json:"hidden_sizes"`
 	BatchSize    int     `json:"batch_size"`
 	Seed         int64   `json:"seed"`
 	LearningRate float64 `json:"learning_rate"`
@@ -28,7 +29,7 @@ type RunConfig struct {
 type runFingerprint struct {
 	DatasetPath  string  `json:"dataset_path"`
 	Epochs       int     `json:"epochs"`
-	HiddenSize   int     `json:"hidden_size"`
+	HiddenSizes  []int   `json:"hidden_sizes"`
 	BatchSize    int     `json:"batch_size"`
 	Seed         int64   `json:"seed"`
 	LearningRate float64 `json:"learning_rate"`
@@ -36,14 +37,21 @@ type runFingerprint struct {
 
 func (c RunConfig) Normalize(defaultLearningRate float64) RunConfig {
 	out := c
+	if len(out.HiddenSizes) == 0 {
+		out.HiddenSizes = []int{128}
+	} else {
+		out.HiddenSizes = cloneIntSlice(out.HiddenSizes)
+	}
 	if out.Name == "" {
-		out.Name = fmt.Sprintf("dense_h%d_lr%g_bs%d_seed%d", out.HiddenSize, out.LearningRate, out.BatchSize, out.Seed)
+		out.Name = fmt.Sprintf("dense_h%s_lr%g_bs%d_seed%d", hiddenSizesLabel(out.HiddenSizes), out.LearningRate, out.BatchSize, out.Seed)
 	}
 	if out.Epochs <= 0 {
 		out.Epochs = 1
 	}
-	if out.HiddenSize <= 0 {
-		out.HiddenSize = 128
+	for i, size := range out.HiddenSizes {
+		if size <= 0 {
+			out.HiddenSizes[i] = 128
+		}
 	}
 	if out.Seed == 0 {
 		out.Seed = 42
@@ -64,7 +72,7 @@ func (c RunConfig) ID() (string, error) {
 	fingerprint := runFingerprint{
 		DatasetPath:  c.DatasetPath,
 		Epochs:       c.Epochs,
-		HiddenSize:   c.HiddenSize,
+		HiddenSizes:  cloneIntSlice(c.HiddenSizes),
 		BatchSize:    c.BatchSize,
 		Seed:         c.Seed,
 		LearningRate: c.LearningRate,
@@ -93,6 +101,14 @@ func (c RunConfig) RunDirectory() (string, error) {
 	return filepath.Join(c.OutputRoot, id+"_"+name), nil
 }
 
+func hiddenSizesLabel(hiddenSizes []int) string {
+	parts := make([]string, len(hiddenSizes))
+	for i, size := range hiddenSizes {
+		parts[i] = fmt.Sprintf("%d", size)
+	}
+	return strings.Join(parts, "x")
+}
+
 func sanitizeRunName(name string) string {
 	name = strings.TrimSpace(strings.ToLower(name))
 	var builder strings.Builder
@@ -113,4 +129,10 @@ func sanitizeRunName(name string) string {
 	}
 
 	return strings.Trim(builder.String(), "_")
+}
+
+func cloneIntSlice(values []int) []int {
+	out := make([]int, len(values))
+	copy(out, values)
+	return out
 }
