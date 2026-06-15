@@ -17,13 +17,13 @@ type LayerCheckpoint struct {
 }
 
 type Checkpoint struct {
-	RunID                  string          `json:"run_id"`
-	Epoch                  int             `json:"epoch"`
-	BestEpoch              int             `json:"best_epoch"`
-	BestValidationLoss     float64         `json:"best_validation_loss"`
-	BestValidationAccuracy float64         `json:"best_validation_accuracy"`
-	Hidden                 LayerCheckpoint `json:"hidden"`
-	Output                 LayerCheckpoint `json:"output"`
+	RunID                  string            `json:"run_id"`
+	Epoch                  int               `json:"epoch"`
+	BestEpoch              int               `json:"best_epoch"`
+	BestValidationLoss     float64           `json:"best_validation_loss"`
+	BestValidationAccuracy float64           `json:"best_validation_accuracy"`
+	Hidden                 []LayerCheckpoint `json:"hidden"`
+	Output                 LayerCheckpoint   `json:"output"`
 }
 
 func NewCheckpoint(runID string, epoch int, bestEpoch int, bestValidation nn.EpochResult, model *nn.MLP) Checkpoint {
@@ -33,7 +33,7 @@ func NewCheckpoint(runID string, epoch int, bestEpoch int, bestValidation nn.Epo
 		BestEpoch:              bestEpoch,
 		BestValidationLoss:     bestValidation.Loss,
 		BestValidationAccuracy: bestValidation.Accuracy,
-		Hidden:                 snapshotLayer(model.Hidden),
+		Hidden:                 snapshotLayers(model.Hidden),
 		Output:                 snapshotLayer(model.Output),
 	}
 }
@@ -78,33 +78,61 @@ func LoadCheckpoint(path string) (Checkpoint, error) {
 }
 
 func RestoreModel(checkpoint Checkpoint) (*nn.MLP, error) {
-	if err := validateLayerCheckpoint(checkpoint.Hidden); err != nil {
-		return nil, fmt.Errorf("invalid hidden checkpoint: %w", err)
+	if len(checkpoint.Hidden) == 0 {
+		return nil, fmt.Errorf("invalid model checkpoint: no hidden layers")
 	}
+
+	for i, hidden := range checkpoint.Hidden {
+		if err := validateLayerCheckpoint(hidden); err != nil {
+			return nil, fmt.Errorf("invalid hidden checkpoint %d: %w", i, err)
+		}
+		if i > 0 && hidden.In != checkpoint.Hidden[i-1].Out {
+			return nil, fmt.Errorf("invalid hidden checkpoint %d: input size %d does not match previous output size %d", i, hidden.In, checkpoint.Hidden[i-1].Out)
+		}
+	}
+
 	if err := validateLayerCheckpoint(checkpoint.Output); err != nil {
 		return nil, fmt.Errorf("invalid output checkpoint: %w", err)
 	}
-	if checkpoint.Output.In != checkpoint.Hidden.Out {
-		return nil, fmt.Errorf("invalid model checkpoint: output input size %d does not match hidden output size %d", checkpoint.Output.In, checkpoint.Hidden.Out)
+	lastHidden := checkpoint.Hidden[len(checkpoint.Hidden)-1]
+	if checkpoint.Output.In != lastHidden.Out {
+		return nil, fmt.Errorf("invalid model checkpoint: output input size %d does not match last hidden output size %d", checkpoint.Output.In, lastHidden.Out)
 	}
 	if checkpoint.Output.Out != 1 {
 		return nil, fmt.Errorf("invalid model checkpoint: output layer must have one neuron, got %d", checkpoint.Output.Out)
 	}
 
-	hidden := restoreLayer(checkpoint.Hidden)
+	hidden := restoreLayers(checkpoint.Hidden)
 	output := restoreLayer(checkpoint.Output)
+
+	hiddenZ := make([][]float64, len(hidden))
+	hiddenA := make([][]float64, len(hidden))
+	deltaHidden := make([][]float64, len(hidden))
+	for i, layer := range hidden {
+		hiddenZ[i] = make([]float64, layer.Out)
+		hiddenA[i] = make([]float64, layer.Out)
+		deltaHidden[i] = make([]float64, layer.Out)
+	}
 
 	return &nn.MLP{
 		Hidden: hidden,
 		Output: output,
 
-		HiddenZ: make([]float64, hidden.Out),
-		HiddenA: make([]float64, hidden.Out),
+		HiddenZ: hiddenZ,
+		HiddenA: hiddenA,
 		OutputZ: make([]float64, output.Out),
 
-		DeltaHidden: make([]float64, hidden.Out),
+		DeltaHidden: deltaHidden,
 		DeltaOutput: make([]float64, output.Out),
 	}, nil
+}
+
+func snapshotLayers(layers []nn.DenseLayer) []LayerCheckpoint {
+	out := make([]LayerCheckpoint, len(layers))
+	for i, layer := range layers {
+		out[i] = snapshotLayer(layer)
+	}
+	return out
 }
 
 func snapshotLayer(layer nn.DenseLayer) LayerCheckpoint {
@@ -114,6 +142,14 @@ func snapshotLayer(layer nn.DenseLayer) LayerCheckpoint {
 		Weights: cloneFloat64Slice(layer.Weights),
 		Biases:  cloneFloat64Slice(layer.Biases),
 	}
+}
+
+func restoreLayers(checkpoints []LayerCheckpoint) []nn.DenseLayer {
+	out := make([]nn.DenseLayer, len(checkpoints))
+	for i, checkpoint := range checkpoints {
+		out[i] = restoreLayer(checkpoint)
+	}
+	return out
 }
 
 func restoreLayer(checkpoint LayerCheckpoint) nn.DenseLayer {
