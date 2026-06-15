@@ -1,23 +1,26 @@
 # MLP Manual em Go para classificação de gatos e cachorros
 
-Este repositório contém a implementação manual de uma MLP para classificação binária de imagens de gatos e cachorros. A implementação foi feita em Go para deixar explícitos os passos matemáticos da rede neural: pré-processamento, propagação direta, funções de ativação, função de perda, retropropagação, atualização de pesos e avaliação.
+Este repositório contém uma implementação manual de uma MLP para classificação binária de imagens de gatos e cachorros. A implementação foi feita em Go para deixar explícitos os principais passos matemáticos da rede neural: pré-processamento, propagação direta, funções de ativação, função de perda, retropropagação, atualização de pesos e avaliação.
 
-A proposta desta etapa do trabalho não é competir com uma CNN, mas construir uma base auditável para entender o funcionamento interno de uma rede neural totalmente conectada. As imagens são reduzidas para 64x64 em escala de cinza e depois vetorizadas em 4096 entradas. Essa escolha simplifica a implementação, mas também remove parte importante da estrutura espacial da imagem, o que limita a generalização do modelo.
+A proposta desta etapa não é competir com uma CNN. O objetivo é construir uma baseline densa auditável para entender o funcionamento interno de uma rede neural totalmente conectada e, depois, comparar essa base com variações como DSA e paralelização.
 
 ## Estrutura atual
 
 ```text
-cmd/train/      Executável principal de treino e avaliação
+cmd/train/      Executa um treino individual
+cmd/sweep/      Executa uma grade de experimentos
+experiment/     Runner, configs, checkpoints e persistência de resultados
 data/           Loader do dataset e pré-processamento das imagens
 metrics/        Métricas, matriz de confusão e logger CSV
-nn/             Implementação da MLP, camadas densas, ativações, loss e treino
-scripts/        Scripts para repetir experimentos de baseline
-results/        Saídas experimentais em CSV e logs
+nn/             MLP, camadas densas, ativações, loss e treino
+scripts/        Scripts auxiliares para reproduzir baselines
+results/        Resultados históricos pequenos
+runs/           Saídas organizadas de experimentos novos
 ```
 
 ## Dataset esperado
 
-O loader espera a seguinte estrutura de diretórios:
+O loader espera a estrutura:
 
 ```text
 dataset/
@@ -32,7 +35,7 @@ dataset/
     dog/
 ```
 
-A versão usada na baseline possui 500 imagens no total, balanceadas entre 250 gatos e 250 cachorros:
+A baseline atual usa 500 imagens balanceadas:
 
 ```text
 train:      300 imagens, 150 cat e 150 dog
@@ -40,7 +43,7 @@ validation: 100 imagens, 50 cat e 50 dog
 test:       100 imagens, 50 cat e 50 dog
 ```
 
-Os rótulos adotados são:
+Rótulos:
 
 ```text
 cat = 0.0
@@ -49,75 +52,78 @@ dog = 1.0
 
 ## Pré-processamento
 
-Cada imagem é processada da seguinte forma:
+Cada imagem é processada assim:
 
-1. Decodificação da imagem JPEG ou PNG.
+1. Decodificação JPEG ou PNG.
 2. Redimensionamento para 64x64 pixels.
-3. Conversão para escala de cinza usando combinação ponderada dos canais RGB.
+3. Conversão para escala de cinza.
 4. Normalização dos pixels para o intervalo [0, 1].
-5. Vetorização em um slice `[]float64` de tamanho 4096.
+5. Vetorização para `[]float64` de tamanho 4096.
 
-O redimensionamento atual usa amostragem por vizinho mais próximo. Isso foi escolhido por simplicidade e auditabilidade nesta primeira fase. Uma interpolação bilinear manual pode ser estudada depois, mas ainda não é necessária para fechar a baseline densa.
-
-## Arquitetura da MLP baseline
-
-A baseline densa oficial atual é:
+A escala de cinza usa:
 
 ```text
-Entrada: 4096 valores
-Camada oculta: 128 neurônios
-Ativação oculta: ReLU
-Saída: 1 neurônio
-Ativação de saída: Sigmoid
-Loss: Binary Cross Entropy
-Otimizador: Gradient Descent manual com mini-batch
-Batch size: 16
-Learning rate: 0.001
-Épocas: 100
-Seeds avaliadas: 1, 2, 3, 4, 5 e 42
+gray = 0.299 * R + 0.587 * G + 0.114 * B
 ```
 
-A camada densa usa pesos em layout `W[input][output]`, armazenados linearmente como:
+A vetorização simplifica a implementação, mas remove relações espaciais locais importantes. Essa limitação é parte da análise da MLP e justifica a comparação posterior com CNN.
+
+## Arquitetura da MLP
+
+A implementação aceita uma ou mais camadas ocultas. A baseline oficial original é:
+
+```text
+4096 -> 128 -> 1
+```
+
+Também é possível executar arquiteturas como:
+
+```text
+4096 -> 256 -> 64 -> 1
+4096 -> 512 -> 128 -> 32 -> 1
+```
+
+A camada oculta usa ReLU e a saída usa sigmoid. A loss é Binary Cross Entropy. O otimizador atual é gradient descent manual com mini-batch.
+
+Os pesos das camadas densas usam layout input-major:
 
 ```text
 Weights[i*Out + o]
 ```
 
-Essa organização favorece clareza e também prepara o código para a futura versão esparsa dinâmica, pois cada entrada ativa aponta para um bloco contíguo de pesos da próxima camada.
+Esse formato facilita auditoria e também prepara a base para a futura versão DSA, onde apenas ativações não nulas poderão contribuir para a próxima camada.
 
 ## Matemática implementada
 
-A propagação direta de uma camada densa calcula:
+Camada densa:
 
 ```text
 z_o = b_o + soma_i(x_i * W_i,o)
 ```
 
-A camada oculta aplica ReLU:
+ReLU:
 
 ```text
 ReLU(x) = max(0, x)
 ```
 
-A saída aplica sigmoid:
+Sigmoid:
 
 ```text
 sigmoid(x) = 1 / (1 + exp(-x))
 ```
 
-Para classificação binária, a loss usada é Binary Cross Entropy:
+Binary Cross Entropy:
 
 ```text
 BCE = -(y * log(yHat) + (1-y) * log(1-yHat))
 ```
 
-Na retropropagação, a combinação de sigmoid na saída com BCE permite a simplificação:
+Com sigmoid na saída e BCE, o delta da saída é:
 
 ```text
 delta_saida = yHat - y
 ```
-
-A camada oculta recebe o erro ponderado pelos pesos da saída e multiplica pela derivada da ReLU.
 
 ## Como rodar
 
@@ -127,49 +133,95 @@ Teste sintético OR:
 go run ./cmd/train
 ```
 
-Treino no dataset real:
+Treino individual com a baseline original:
 
 ```bash
-go run ./cmd/train --dataset ./dataset --epochs 100 --hidden 128 --batch 16 --lr 0.001 --log-every 10
+go run ./cmd/train \
+  --dataset ./dataset \
+  --epochs 100 \
+  --hidden 128 \
+  --batch 16 \
+  --lr 0.001 \
+  --run-dir runs/manual_h128_b16_lr001_seed42 \
+  --seed 42 \
+  --log-every 10
 ```
 
-Rodada oficial da baseline densa:
+Treino individual com mais de uma camada oculta:
 
 ```bash
-chmod +x scripts/run_dense_baseline_h128_b16_lr001.sh
-./scripts/run_dense_baseline_h128_b16_lr001.sh ./dataset
+go run ./cmd/train \
+  --dataset ./dataset \
+  --epochs 100 \
+  --hidden 256x64 \
+  --batch 16 \
+  --lr 0.001 \
+  --run-dir runs/manual_h256x64_b16_lr001_seed42 \
+  --seed 42
 ```
 
-O script cria a pasta:
+Formatos aceitos em `--hidden`:
 
 ```text
-results/baseline_dense_h128_b16_lr001/
+128
+256x64
+512-128
+1024:256:64
 ```
 
-E salva:
+## Sweep de experimentos
+
+O comando `cmd/sweep` executa várias combinações de arquitetura, batch size, learning rate e seed.
+
+Exemplo pequeno:
+
+```bash
+go run ./cmd/sweep \
+  --dataset ./dataset \
+  --epochs 100 \
+  --hidden '128;256x64;512x128' \
+  --batch '16,32' \
+  --lr '0.001,0.0003' \
+  --seeds '1,2,3,4,5,42' \
+  --workers 1 \
+  --runs runs/dense_sweep_v1
+```
+
+Cada execução gera uma pasta própria dentro de `runs/`, contendo:
 
 ```text
-seed_1.csv, seed_1.log, ..., seed_42.csv, seed_42.log
-summary.csv
+config.json
+summary.json
+metrics.csv
+confusion_matrix.csv
+test_predictions.csv
+checkpoints/best.gob
+checkpoints/latest.gob
 ```
+
+Se uma execução já tiver `summary.json` completo, o runner reutiliza o resultado e marca a execução como `cached`.
 
 ## Seleção de checkpoint
 
-Durante o treino, a cada época o modelo é avaliado no conjunto de validação. O código clona o estado da MLP sempre que a validação melhora. Ao final, o conjunto de teste é avaliado usando o melhor checkpoint de validação, e não necessariamente o modelo da última época.
+Durante o treino, a cada época o modelo é avaliado no conjunto de validação. O código clona o estado da MLP sempre que a validação melhora.
 
-O critério de escolha é:
+Critério de escolha:
 
 1. Maior acurácia de validação.
-2. Em caso de empate, menor loss de validação.
+2. Em empate, menor loss de validação.
 
-Isso reduz o risco de reportar uma época posterior já afetada por overfitting.
+O conjunto de teste é avaliado usando o melhor checkpoint de validação, não necessariamente a última época.
 
-## Resultado da baseline densa
+## Resultado da baseline densa original
 
-A execução oficial com 6 seeds mostrou forte instabilidade e desempenho médio próximo do acaso no teste. A tabela consolidada está em:
+A configuração original documentada foi:
 
 ```text
-results/baseline_dense_h128_b16_lr001/summary.csv
+hidden = 128
+batch = 16
+lr = 0.001
+epochs = 100
+seeds = 1, 2, 3, 4, 5, 42
 ```
 
 Resumo observado:
@@ -182,14 +234,12 @@ Melhor test accuracy: 54%
 Pior test accuracy: 44%
 ```
 
-A interpretação é que a MLP aprende parte do conjunto de treino, mas não encontra uma representação robusta para generalizar bem em imagens vetorizadas. Isso é esperado: ao transformar a imagem em vetor, a rede perde relações espaciais locais importantes como bordas, texturas e formas. Essa limitação será importante para comparar a MLP com a CNN nas etapas seguintes do trabalho.
+A interpretação é que a MLP aprende parte do conjunto de treino, mas não encontra uma representação robusta para generalizar bem em imagens vetorizadas.
 
 ## Próximos passos planejados
 
-1. Congelar e documentar a baseline densa.
-2. Escrever a seção de análise experimental da MLP.
-3. Implementar a versão DSA exact sparse, preservando a mesma função da rede densa.
-4. Comparar MLP densa e DSA em tempo, loss, acurácia e sparsity.
-5. Só depois estudar goroutines, paralelismo e possíveis experimentos CUDA.
-
-A prioridade atual é manter a MLP correta, mensurável e auditável antes de adicionar otimizações.
+1. Padronizar a bateria de testes densos com `cmd/sweep`.
+2. Comparar tamanhos de batch, learning rates e arquiteturas ocultas.
+3. Documentar resultados densos com média por seed.
+4. Implementar DSA exact sparse preservando a função da rede densa.
+5. Comparar MLP densa e DSA em tempo, loss, acurácia e sparsity.
