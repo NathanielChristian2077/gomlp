@@ -13,6 +13,24 @@ func ReLU(x float64) float64 {
 	return 0
 }
 
+func ReLUToActive(z []float64) ActiveVector {
+	idx := make([]int, 0, len(z))
+	values := make([]float64, 0, len(z))
+
+	for i, v := range z {
+		if v > 0 {
+			idx = append(idx, i)
+			values = append(values, v)
+		}
+	}
+
+	return ActiveVector{
+		Size:   len(z),
+		Idx:    idx,
+		Values: values,
+	}
+}
+
 // ReLUDerivativeFromActivation calcula a derivada da ReLU usando a ativação já computada.
 // Se a ativação final foi maior que zero, o neurônio estava ativo e a derivada é 1.
 // Se a ativação foi zero, o neurônio é tratado como inativo e a derivada é 0.

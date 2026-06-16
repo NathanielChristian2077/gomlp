@@ -21,6 +21,12 @@ type DenseLayer struct {
 	GradB []float64
 }
 
+type ActiveVector struct {
+	Size   int
+	Idx    []int
+	Values []float64
+}
+
 // NewDenseLayer cria uma camada densa com inicialização He.
 // A escala sqrt(2/in) é adequada para camadas que usam ReLU,
 // ajudando a manter a magnitude das ativações mais estável no início do treino.
@@ -80,6 +86,20 @@ func (l *DenseLayer) Forward(input, output []float64) {
 
 		for o := 0; o < l.Out; o++ {
 			output[o] += x * l.Weights[base+o]
+		}
+	}
+}
+
+func (l *DenseLayer) ForwardSparse(input ActiveVector, z []float64) {
+	copy(z, l.Biases)
+
+	for k, j := range input.Idx {
+		x := input.Values[k]
+
+		base := j * l.Out
+
+		for o := 0; o < l.Out; o++ {
+			z[o] += x * l.Weights[base+o]
 		}
 	}
 }
