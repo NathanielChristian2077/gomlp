@@ -6,9 +6,9 @@ import (
 )
 
 func TestReLUToActivePreservesPositiveIndices(t *testing.T) {
-	z := []float64{-2.0, 0.0, 1.5, -0.0, 3.25, -7.0, 0.01}
+	z := []float64{-2.0, 0.0, 1.5, 0.0, 3.25, -7.0, 0.01}
 
-	active := ReLUToActive(z)
+	active := ReLUToActive(z, 0)
 
 	if active.Size != len(z) {
 		t.Fatalf("expected active vector size %d, got %d", len(z), active.Size)
@@ -17,7 +17,7 @@ func TestReLUToActivePreservesPositiveIndices(t *testing.T) {
 	expectedIdx := []int{2, 4, 6}
 	expectedValues := []float64{1.5, 3.25, 0.01}
 
-	assertIntSlicesEqual(t, active.Idx, expectedIdx)
+	assertIntSlicesEqual(t, active.Indices, expectedIdx)
 	assertFloatSlicesClose(t, active.Values, expectedValues, 0)
 }
 
@@ -41,7 +41,7 @@ func TestForwardSparseMatchesDenseForwardAfterReLU(t *testing.T) {
 		denseInput[i] = ReLU(z)
 	}
 
-	activeInput := ReLUToActive(preActivation)
+	activeInput := ReLUToActive(preActivation, 0)
 	denseOutput := make([]float64, layer.Out)
 	sparseOutput := make([]float64, layer.Out)
 
@@ -64,7 +64,7 @@ func TestForwardSparseWithNoActiveInputsReturnsBiases(t *testing.T) {
 		Biases: []float64{-0.75, 1.25},
 	}
 
-	activeInput := ReLUToActive([]float64{-3.0, 0.0, -1.0, -0.5})
+	activeInput := ReLUToActive([]float64{-3.0, 0.0, -1.0, -0.5}, 0)
 	output := []float64{999.0, -999.0}
 
 	layer.ForwardSparse(activeInput, output)
@@ -81,9 +81,9 @@ func TestForwardSparseOverwritesPreviousOutputValues(t *testing.T) {
 	}
 
 	activeInput := ActiveVector{
-		Size:   2,
-		Idx:    []int{0, 1},
-		Values: []float64{4.0, 2.0},
+		Size:    2,
+		Indices: []int{0, 1},
+		Values:  []float64{4.0, 2.0},
 	}
 
 	firstOutput := make([]float64, layer.Out)
