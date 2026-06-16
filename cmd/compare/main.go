@@ -253,11 +253,12 @@ func evaluateSparse(model *nn.MLP, samples []nn.Sample, split string, threshold 
 	activationSlotsTotal := 0
 	layerActiveTotals := make([]int, len(model.Hidden))
 	layerSlotTotals := make([]int, len(model.Hidden))
+	workspace := nn.NewSparseForwardWorkspace(model)
 	maxAbsDiff := 0.0
 	mismatchCount := 0
 
 	for i, sample := range samples {
-		yHat, stats := model.ForwardSparseWithStats(sample.X, threshold)
+		yHat, stats := model.ForwardSparseWithStatsWorkspace(sample.X, threshold, workspace)
 		predicted := metrics.Classify(yHat, nn.DefaultClassificationThreshold)
 
 		loss += nn.BinaryCrossEntropy(yHat, sample.Y)
