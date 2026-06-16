@@ -17,26 +17,26 @@ import (
 )
 
 type compareResult struct {
-	Mode                  string
-	Threshold             float64
-	Split                 string
-	Samples               int
-	Loss                  float64
-	Accuracy              float64
-	Precision             float64
-	Recall                float64
-	F1                    float64
-	TrueNegative          int
-	FalsePositive         int
-	FalseNegative         int
-	TruePositive          int
-	DurationMilliseconds  int64
-	DenseOpsTotal         int
-	SparseOpsTotal        int
-	EstimatedSpeedup      float64
-	AverageActiveRatio    float64
-	AverageSparsity       float64
-	MaxAbsDiffFromDense   float64
+	Mode                   string
+	Threshold              float64
+	Split                  string
+	Samples                int
+	Loss                   float64
+	Accuracy               float64
+	Precision              float64
+	Recall                 float64
+	F1                     float64
+	TrueNegative           int
+	FalsePositive          int
+	FalseNegative          int
+	TruePositive           int
+	DurationMilliseconds   int64
+	DenseOpsTotal          int
+	SparseOpsTotal         int
+	EstimatedSpeedup       float64
+	AverageActiveRatio     float64
+	AverageSparsity        float64
+	MaxAbsDiffFromDense    float64
 	MismatchCountFromDense int
 }
 
@@ -137,6 +137,7 @@ func main() {
 		}
 	}
 
+	hiddenLabel := experiment.HiddenSizesLabel(model.HiddenSizes())
 	denseResult, densePredictions, err := evaluateDense(model, samples, normalizedSplit)
 	if err != nil {
 		log.Fatal(err)
@@ -151,7 +152,7 @@ func main() {
 		results = append(results, result)
 	}
 
-	if err := writeCompareCSV(out, runID, *runName, experiment.HiddenSizesLabel(hiddenSizes), bestEpoch, results); err != nil {
+	if err := writeCompareCSV(out, runID, *runName, hiddenLabel, bestEpoch, results); err != nil {
 		log.Fatal(err)
 	}
 
@@ -193,26 +194,26 @@ func evaluateDense(model *nn.MLP, samples []nn.Sample, split string) (compareRes
 	}
 
 	return compareResult{
-		Mode:                  "dense",
-		Threshold:             0,
-		Split:                 split,
-		Samples:               len(samples),
-		Loss:                  loss / float64(len(samples)),
-		Accuracy:              confusion.Accuracy(),
-		Precision:             confusion.Precision(),
-		Recall:                confusion.Recall(),
-		F1:                    confusion.F1(),
-		TrueNegative:          confusion.TrueNegative,
-		FalsePositive:         confusion.FalsePositive,
-		FalseNegative:         confusion.FalseNegative,
-		TruePositive:          confusion.TruePositive,
-		DurationMilliseconds:  time.Since(startedAt).Milliseconds(),
-		DenseOpsTotal:         modelDenseOps(model) * len(samples),
-		SparseOpsTotal:        modelDenseOps(model) * len(samples),
-		EstimatedSpeedup:      1,
-		AverageActiveRatio:    1,
-		AverageSparsity:       0,
-		MaxAbsDiffFromDense:   0,
+		Mode:                   "dense",
+		Threshold:              0,
+		Split:                  split,
+		Samples:                len(samples),
+		Loss:                   loss / float64(len(samples)),
+		Accuracy:               confusion.Accuracy(),
+		Precision:              confusion.Precision(),
+		Recall:                 confusion.Recall(),
+		F1:                     confusion.F1(),
+		TrueNegative:           confusion.TrueNegative,
+		FalsePositive:          confusion.FalsePositive,
+		FalseNegative:          confusion.FalseNegative,
+		TruePositive:           confusion.TruePositive,
+		DurationMilliseconds:   time.Since(startedAt).Milliseconds(),
+		DenseOpsTotal:          modelDenseOps(model) * len(samples),
+		SparseOpsTotal:         modelDenseOps(model) * len(samples),
+		EstimatedSpeedup:       1,
+		AverageActiveRatio:     1,
+		AverageSparsity:        0,
+		MaxAbsDiffFromDense:    0,
 		MismatchCountFromDense: 0,
 	}, predictions, nil
 }
@@ -278,26 +279,26 @@ func evaluateSparse(model *nn.MLP, samples []nn.Sample, split string, threshold 
 	}
 
 	return compareResult{
-		Mode:                  mode,
-		Threshold:             threshold,
-		Split:                 split,
-		Samples:               len(samples),
-		Loss:                  loss / float64(len(samples)),
-		Accuracy:              confusion.Accuracy(),
-		Precision:             confusion.Precision(),
-		Recall:                confusion.Recall(),
-		F1:                    confusion.F1(),
-		TrueNegative:          confusion.TrueNegative,
-		FalsePositive:         confusion.FalsePositive,
-		FalseNegative:         confusion.FalseNegative,
-		TruePositive:          confusion.TruePositive,
-		DurationMilliseconds:  time.Since(startedAt).Milliseconds(),
-		DenseOpsTotal:         denseOpsTotal,
-		SparseOpsTotal:        sparseOpsTotal,
-		EstimatedSpeedup:      estimatedSpeedup,
-		AverageActiveRatio:    averageActiveRatio,
-		AverageSparsity:       averageSparsity,
-		MaxAbsDiffFromDense:   maxAbsDiff,
+		Mode:                   mode,
+		Threshold:              threshold,
+		Split:                  split,
+		Samples:                len(samples),
+		Loss:                   loss / float64(len(samples)),
+		Accuracy:               confusion.Accuracy(),
+		Precision:              confusion.Precision(),
+		Recall:                 confusion.Recall(),
+		F1:                     confusion.F1(),
+		TrueNegative:           confusion.TrueNegative,
+		FalsePositive:          confusion.FalsePositive,
+		FalseNegative:          confusion.FalseNegative,
+		TruePositive:           confusion.TruePositive,
+		DurationMilliseconds:   time.Since(startedAt).Milliseconds(),
+		DenseOpsTotal:          denseOpsTotal,
+		SparseOpsTotal:         sparseOpsTotal,
+		EstimatedSpeedup:       estimatedSpeedup,
+		AverageActiveRatio:     averageActiveRatio,
+		AverageSparsity:        averageSparsity,
+		MaxAbsDiffFromDense:    maxAbsDiff,
 		MismatchCountFromDense: mismatchCount,
 	}, nil
 }
