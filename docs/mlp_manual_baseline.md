@@ -1,10 +1,10 @@
-# Relatório parcial: MLP manual densa
+# Relatório: MLP manual densa
 
 ## Objetivo
 
-Esta etapa implementa manualmente uma MLP para classificação binária de imagens de gatos e cachorros. A implementação foi feita em Go para tornar explícitos os passos principais de uma rede neural: pré-processamento, forward, ativações, loss, backpropagation, atualização de pesos e avaliação.
+Esta etapa implementa manualmente uma MLP para classificação binária de imagens de gatos e cachorros. A implementação foi feita em Go para tornar explícitos os passos principais de uma rede neural: pré-processamento, forward, ativações, loss, backpropagation, atualização de pesos, checkpoints e avaliação.
 
-A proposta desta MLP não é superar uma CNN. O objetivo é criar uma baseline manual, auditável e matematicamente compreensível para posterior comparação. A implementação atual aceita uma ou mais camadas ocultas, mas a baseline oficial inicial continua sendo a arquitetura simples `4096 -> 128 -> 1`.
+A proposta desta MLP não é superar uma CNN. O objetivo é criar uma baseline manual, auditável e matematicamente compreensível, servindo como ponto de comparação para as etapas posteriores do trabalho.
 
 ## Dataset
 
@@ -45,7 +45,7 @@ A escala de cinza usa:
 gray = 0.299 * R + 0.587 * G + 0.114 * B
 ```
 
-A vetorização simplifica a implementação, mas remove a estrutura espacial local da imagem. Essa limitação é central para interpretar os resultados da MLP.
+A vetorização simplifica a implementação, mas remove a estrutura espacial local da imagem. Essa limitação é central para interpretar os resultados da MLP, já que a rede totalmente conectada não possui filtros locais nem compartilhamento de pesos.
 
 ## Arquitetura
 
@@ -71,6 +71,7 @@ Seeds: 1, 2, 3, 4, 5, 42
 A implementação atual também permite arquiteturas profundas, como:
 
 ```text
+4096 -> 64 -> 1
 4096 -> 256 -> 64 -> 1
 4096 -> 512 -> 128 -> 32 -> 1
 ```
@@ -92,16 +93,8 @@ representa:
 Cada camada densa calcula:
 
 ```text
-z_o = b_o + soma_i(x_i * W_i,o)
+z_j = b_j + soma_i(W_j,i * x_i)
 ```
-
-Os pesos são armazenados em layout input-major:
-
-```text
-Weights[i*Out + o]
-```
-
-Esse layout é simples para auditar e será útil na futura DSA, pois cada entrada ativa aponta para um bloco contíguo de pesos.
 
 Em uma arquitetura com várias camadas ocultas, a saída ativada de cada camada vira a entrada da próxima:
 
@@ -232,16 +225,20 @@ Test accuracy média: 49,7%
 F1 médio: 43,7%
 ```
 
+## Bateria densa posterior
+
+Após a baseline inicial, foram executados sweeps adicionais variando arquitetura, batch size, learning rate e seed. A configuração densa rasa `4096 -> 64 -> 1`, com `lr = 0.003` e `batch = 16`, apresentou a melhor acurácia média em teste entre as baterias finais, aproximadamente 55,5%.
+
+A arquitetura `4096 -> 256 -> 64 -> 1`, com os mesmos hiperparâmetros, apresentou F1 médio superior em algumas combinações, mas com custo computacional maior.
+
 ## Discussão
 
 A MLP mostrou que o pipeline está funcional: o modelo aprende problemas sintéticos simples e reduz loss no treino real. Porém, no dataset de imagens, a acurácia de teste ficou próxima do acaso.
 
 Esse resultado é coerente com a limitação da MLP sobre imagens vetorizadas. Ao transformar a imagem em um vetor de 4096 valores, relações espaciais importantes são perdidas. A rede não possui filtros locais, compartilhamento de pesos nem viés espacial, ao contrário de uma CNN.
 
-A nova infraestrutura com múltiplas camadas e sweeps permite testar essa limitação com mais rigor, sem misturar resultados soltos ou perder rastreabilidade das configurações.
+A infraestrutura com múltiplas camadas, checkpoints e sweeps permite testar essa limitação com mais rigor, sem misturar resultados soltos ou perder rastreabilidade das configurações.
 
-## Conclusão parcial
+## Conclusão
 
-A baseline densa inicial está pronta para documentação e comparação. A implementação agora também permite uma bateria de testes densos mais ampla, variando arquitetura, batch size, learning rate e seed.
-
-A próxima etapa será definir uma grade experimental controlada para a MLP densa. Depois disso, a DSA exact sparse poderá ser implementada sobre uma base mais estável e bem registrada.
+A baseline densa está pronta para apresentação como implementação manual e independente. Ela demonstra de forma auditável os principais componentes de uma rede neural totalmente conectada e fornece uma base coerente para comparação com CNN e transfer learning nas etapas seguintes.
