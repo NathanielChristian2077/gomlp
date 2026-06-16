@@ -2,7 +2,7 @@
 
 Este repositório contém uma implementação manual de uma MLP para classificação binária de imagens de gatos e cachorros. A implementação foi feita em Go para deixar explícitos os principais passos matemáticos da rede neural: pré-processamento, propagação direta, funções de ativação, função de perda, retropropagação, atualização de pesos e avaliação.
 
-A proposta desta etapa não é competir com uma CNN. O objetivo é construir uma baseline densa auditável para entender o funcionamento interno de uma rede neural totalmente conectada e, depois, comparar essa base com variações como DSA e paralelização.
+A proposta desta etapa não é competir com uma CNN. O objetivo é construir uma baseline densa auditável para entender o funcionamento interno de uma rede neural totalmente conectada aplicada a imagens vetorizadas.
 
 ## Estrutura atual
 
@@ -66,7 +66,7 @@ A escala de cinza usa:
 gray = 0.299 * R + 0.587 * G + 0.114 * B
 ```
 
-A vetorização simplifica a implementação, mas remove relações espaciais locais importantes. Essa limitação é parte da análise da MLP e justifica a comparação posterior com CNN.
+A vetorização simplifica a implementação, mas remove relações espaciais locais importantes. Essa limitação é parte central da análise da MLP e justifica a comparação posterior com arquiteturas convolucionais.
 
 ## Arquitetura da MLP
 
@@ -79,26 +79,19 @@ A implementação aceita uma ou mais camadas ocultas. A baseline oficial origina
 Também é possível executar arquiteturas como:
 
 ```text
+4096 -> 64 -> 1
 4096 -> 256 -> 64 -> 1
 4096 -> 512 -> 128 -> 32 -> 1
 ```
 
 A camada oculta usa ReLU e a saída usa sigmoid. A loss é Binary Cross Entropy. O otimizador atual é gradient descent manual com mini-batch.
 
-Os pesos das camadas densas usam layout input-major:
-
-```text
-Weights[i*Out + o]
-```
-
-Esse formato facilita auditoria e também prepara a base para a futura versão DSA, onde apenas ativações não nulas poderão contribuir para a próxima camada.
-
 ## Matemática implementada
 
 Camada densa:
 
 ```text
-z_o = b_o + soma_i(x_i * W_i,o)
+z_j = b_j + soma_i(W_j,i * x_i)
 ```
 
 ReLU:
@@ -123,6 +116,13 @@ Com sigmoid na saída e BCE, o delta da saída é:
 
 ```text
 delta_saida = yHat - y
+```
+
+Os gradientes são acumulados por mini-batch e aplicados por gradient descent:
+
+```text
+W = W - lr * (dW / batch_size)
+b = b - lr * (dB / batch_size)
 ```
 
 ## Como rodar
@@ -236,10 +236,28 @@ Pior test accuracy: 44%
 
 A interpretação é que a MLP aprende parte do conjunto de treino, mas não encontra uma representação robusta para generalizar bem em imagens vetorizadas.
 
-## Próximos passos planejados
+## Resultado da bateria densa otimizada
 
-1. Padronizar a bateria de testes densos com `cmd/sweep`.
-2. Comparar tamanhos de batch, learning rates e arquiteturas ocultas.
-3. Documentar resultados densos com média por seed.
-4. Implementar DSA exact sparse preservando a função da rede densa.
-5. Comparar MLP densa e DSA em tempo, loss, acurácia e sparsity.
+Após a infraestrutura de sweeps, foram testadas arquiteturas e hiperparâmetros adicionais. Duas configurações se destacaram:
+
+```text
+4096 -> 64 -> 1
+lr = 0.003
+batch = 16
+
+4096 -> 256 -> 64 -> 1
+lr = 0.003
+batch = 16
+```
+
+A configuração `4096 -> 64 -> 1` apresentou a melhor acurácia média em teste entre os experimentos densos finais, com aproximadamente 55,5%. A configuração `4096 -> 256 -> 64 -> 1` apresentou F1 médio superior em algumas baterias, mas com custo computacional maior.
+
+## Discussão
+
+A MLP manual valida o pipeline completo de classificação: leitura do dataset, pré-processamento, forward, backpropagation, atualização por mini-batch, checkpoints, avaliação e registro de métricas.
+
+Os resultados também evidenciam a limitação da MLP densa em imagens vetorizadas. Ao transformar cada imagem em um vetor de 4096 valores, a rede perde relações espaciais locais que são essenciais para visão computacional. Por isso, os resultados ficam próximos do acaso em várias configurações, mesmo quando o treino reduz a loss.
+
+## Conclusão
+
+A baseline densa está pronta como implementação manual, auditável e independente. Ela cumpre o papel de etapa inicial do projeto: demonstrar o funcionamento interno de uma rede neural totalmente conectada e fornecer uma base justa para comparação posterior com CNN e transfer learning.
