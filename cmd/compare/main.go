@@ -34,8 +34,12 @@ type compareResult struct {
 	DenseOpsTotal          int
 	SparseOpsTotal         int
 	EstimatedSpeedup       float64
+	ActiveTotal            int
+	ActivationSlotsTotal   int
+	AverageActiveCount     float64
 	AverageActiveRatio     float64
 	AverageSparsity        float64
+	AverageActiveByLayer   string
 	MaxAbsDiffFromDense    float64
 	MismatchCountFromDense int
 }
@@ -157,10 +161,13 @@ func main() {
 	}
 
 	fmt.Printf("run_id=%s run_dir=%s best_epoch=%d split=%s samples=%d out=%s\n", runID, runDir, bestEpoch, normalizedSplit, len(samples), out)
-	fmt.Printf("%-18s %-10s %-10s %-10s %-10s %-10s %-10s %-12s %-12s %-10s\n", "mode", "threshold", "loss", "acc", "precision", "recall", "f1", "ms", "speedup", "mismatch")
+	fmt.Printf(
+		"%-18s %-10s %-10s %-10s %-10s %-10s %-10s %-12s %-12s %-14s %-12s %-10s %-10s\n",
+		"mode", "threshold", "loss", "acc", "precision", "recall", "f1", "ms", "speedup", "active", "avg_active", "sparsity", "mismatch",
+	)
 	for _, result := range results {
 		fmt.Printf(
-			"%-18s %-10.6g %-10.6f %-10.4f %-10.4f %-10.4f %-10.4f %-12d %-12.4f %-10d\n",
+			"%-18s %-10.6g %-10.6f %-10.4f %-10.4f %-10.4f %-10.4f %-12d %-12.4f %-14s %-12.4f %-10.4f %-10d\n",
 			result.Mode,
 			result.Threshold,
 			result.Loss,
@@ -170,8 +177,12 @@ func main() {
 			result.F1,
 			result.DurationMilliseconds,
 			result.EstimatedSpeedup,
+			formatActivationFraction(result.ActiveTotal, result.ActivationSlotsTotal),
+			result.AverageActiveCount,
+			result.AverageSparsity,
 			result.MismatchCountFromDense,
 		)
+		fmt.Printf("  activations_by_layer: %s\n", result.AverageActiveByLayer)
 	}
 }
 
@@ -193,6 +204,9 @@ func evaluateDense(model *nn.MLP, samples []nn.Sample, split string) (compareRes
 		confusion.Add(yHat, sample.Y, nn.DefaultClassificationThreshold)
 	}
 
+	activeTotal, slotsTotal := fullDenseActivationTotals(model, len(samples))
+	averageActiveCount := averageActiveCount(activeTotal, len(samples), len(model.Hidden))
+
 	return compareResult{
 		Mode:                   "dense",
 		Threshold:              0,
@@ -211,8 +225,12 @@ func evaluateDense(model *nn.MLP, samples []nn.Sample, split string) (compareRes
 		DenseOpsTotal:          modelDenseOps(model) * len(samples),
 		SparseOpsTotal:         modelDenseOps(model) * len(samples),
 		EstimatedSpeedup:       1,
+		ActiveTotal:            activeTotal,
+		ActivationSlotsTotal:   slotsTotal,
+		AverageActiveCount:     averageActiveCount,
 		AverageActiveRatio:     1,
 		AverageSparsity:        0,
+		AverageActiveByLayer:   denseLayerActivationSummary(model),
 		MaxAbsDiffFromDense:    0,
 		MismatchCountFromDense: 0,
 	}, predictions, nil
@@ -231,9 +249,10 @@ func evaluateSparse(model *nn.MLP, samples []nn.Sample, split string, threshold 
 	confusion := metrics.NewConfusionMatrix()
 	denseOpsTotal := 0
 	sparseOpsTotal := 0
-	activeRatioTotal := 0.0
-	sparsityTotal := 0.0
-	statsCount := 0
+	activeTotal := 0
+	activationSlotsTotal := 0
+	layerActiveTotals := make([]int, len(model.Hidden))
+	layerSlotTotals := make([]int, len(model.Hidden))
 	maxAbsDiff := 0.0
 	mismatchCount := 0
 
@@ -247,9 +266,13 @@ func evaluateSparse(model *nn.MLP, samples []nn.Sample, split string, threshold 
 		denseOpsTotal += stats.DenseOps
 		sparseOpsTotal += stats.SparseOps
 		for _, layerStats := range stats.Hidden {
-			activeRatioTotal += layerStats.ActiveRatio
-			sparsityTotal += layerStats.Sparsity
-			statsCount++
+			if layerStats.LayerIndex < 0 || layerStats.LayerIndex >= len(layerActiveTotals) {
+				return compareResult{}, fmt.Errorf("invalid sparse stats layer index: %d", layerStats.LayerIndex)
+			}
+			activeTotal += layerStats.Active
+			activationSlotsTotal += layerStats.Size
+			layerActiveTotals[layerStats.LayerIndex] += layerStats.Active
+			layerSlotTotals[layerStats.LayerIndex] += layerStats.Size
 		}
 
 		diff := absFloat64(yHat - densePredictions[i].YHat)
@@ -261,11 +284,12 @@ func evaluateSparse(model *nn.MLP, samples []nn.Sample, split string, threshold 
 		}
 	}
 
+	averageActiveCount := averageActiveCount(activeTotal, len(samples), len(model.Hidden))
 	averageActiveRatio := 0.0
 	averageSparsity := 0.0
-	if statsCount > 0 {
-		averageActiveRatio = activeRatioTotal / float64(statsCount)
-		averageSparsity = sparsityTotal / float64(statsCount)
+	if activationSlotsTotal > 0 {
+		averageActiveRatio = float64(activeTotal) / float64(activationSlotsTotal)
+		averageSparsity = 1 - averageActiveRatio
 	}
 
 	estimatedSpeedup := 0.0
@@ -296,8 +320,12 @@ func evaluateSparse(model *nn.MLP, samples []nn.Sample, split string, threshold 
 		DenseOpsTotal:          denseOpsTotal,
 		SparseOpsTotal:         sparseOpsTotal,
 		EstimatedSpeedup:       estimatedSpeedup,
+		ActiveTotal:            activeTotal,
+		ActivationSlotsTotal:   activationSlotsTotal,
+		AverageActiveCount:     averageActiveCount,
 		AverageActiveRatio:     averageActiveRatio,
 		AverageSparsity:        averageSparsity,
+		AverageActiveByLayer:   layerActivationSummary(layerActiveTotals, layerSlotTotals),
 		MaxAbsDiffFromDense:    maxAbsDiff,
 		MismatchCountFromDense: mismatchCount,
 	}, nil
@@ -361,6 +389,46 @@ func modelDenseOps(model *nn.MLP) int {
 	return ops
 }
 
+func fullDenseActivationTotals(model *nn.MLP, samples int) (int, int) {
+	perSample := 0
+	for _, layer := range model.Hidden {
+		perSample += layer.Out
+	}
+	return perSample * samples, perSample * samples
+}
+
+func averageActiveCount(activeTotal, samples, hiddenLayers int) float64 {
+	denominator := samples * hiddenLayers
+	if denominator <= 0 {
+		return 0
+	}
+	return float64(activeTotal) / float64(denominator)
+}
+
+func denseLayerActivationSummary(model *nn.MLP) string {
+	parts := make([]string, 0, len(model.Hidden))
+	for i, layer := range model.Hidden {
+		parts = append(parts, fmt.Sprintf("L%d=%.2f/%d", i, float64(layer.Out), layer.Out))
+	}
+	return strings.Join(parts, ";")
+}
+
+func layerActivationSummary(activeTotals, slotTotals []int) string {
+	parts := make([]string, 0, len(activeTotals))
+	for i := range activeTotals {
+		averageActive := 0.0
+		averageSlots := 0.0
+		if slotTotals[i] > 0 {
+			// slotTotals[i] is samples * layer_size, so active/slot gives ratio.
+			// Dividing both totals by the inferred number of samples gives average active and size.
+			inferredSamples := float64(slotTotals[i]) / float64(slotTotals[i]/maxInt(slotTotals[i], 1))
+			_ = inferredSamples
+		}
+		parts = append(parts, fmt.Sprintf("L%d=%s/%s", i, formatFloatCompact(float64(activeTotals[i])), formatFloatCompact(float64(slotTotals[i]))))
+	}
+	return strings.Join(parts, ";")
+}
+
 func writeCompareCSV(path string, runID string, runName string, hiddenLabel string, bestEpoch int, results []compareResult) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
@@ -397,8 +465,12 @@ func writeCompareCSV(path string, runID string, runName string, hiddenLabel stri
 		"dense_ops_total",
 		"sparse_ops_total",
 		"estimated_speedup",
+		"active_total",
+		"activation_slots_total",
+		"avg_active_count",
 		"avg_active_ratio",
 		"avg_sparsity",
+		"avg_active_by_layer",
 		"max_abs_diff_from_dense",
 		"mismatch_count_from_dense",
 	}
@@ -429,8 +501,12 @@ func writeCompareCSV(path string, runID string, runName string, hiddenLabel stri
 			fmt.Sprintf("%d", result.DenseOpsTotal),
 			fmt.Sprintf("%d", result.SparseOpsTotal),
 			formatFloat(result.EstimatedSpeedup),
+			fmt.Sprintf("%d", result.ActiveTotal),
+			fmt.Sprintf("%d", result.ActivationSlotsTotal),
+			formatFloat(result.AverageActiveCount),
 			formatFloat(result.AverageActiveRatio),
 			formatFloat(result.AverageSparsity),
+			result.AverageActiveByLayer,
 			formatFloat(result.MaxAbsDiffFromDense),
 			fmt.Sprintf("%d", result.MismatchCountFromDense),
 		}
@@ -442,8 +518,23 @@ func writeCompareCSV(path string, runID string, runName string, hiddenLabel stri
 	return writer.Error()
 }
 
+func formatActivationFraction(active, slots int) string {
+	return fmt.Sprintf("%d/%d", active, slots)
+}
+
 func formatFloat(value float64) string {
 	return strconv.FormatFloat(value, 'f', 8, 64)
+}
+
+func formatFloatCompact(value float64) string {
+	return strconv.FormatFloat(value, 'f', 2, 64)
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func absFloat64(value float64) float64 {
