@@ -1,10 +1,10 @@
-# Relatório parcial: MLP manual densa
+# Relatório: MLP manual densa e extensão DSA
 
 ## Objetivo
 
 Esta etapa implementa manualmente uma MLP para classificação binária de imagens de gatos e cachorros. A implementação foi feita em Go para tornar explícitos os passos principais de uma rede neural: pré-processamento, forward, ativações, loss, backpropagation, atualização de pesos e avaliação.
 
-A proposta desta MLP não é superar uma CNN. O objetivo é criar uma baseline manual, auditável e matematicamente compreensível para posterior comparação. A implementação atual aceita uma ou mais camadas ocultas, mas a baseline oficial inicial continua sendo a arquitetura simples `4096 -> 128 -> 1`.
+Além da baseline densa, este branch inclui uma extensão experimental de Dynamic Sparse Activation, DSA. A extensão foi implementada para avaliar se ativações nulas ou muito pequenas induzidas pela ReLU podem ser ignoradas na propagação entre camadas, preservando ou aproximando o comportamento da MLP densa.
 
 ## Dataset
 
@@ -49,30 +49,20 @@ A vetorização simplifica a implementação, mas remove a estrutura espacial lo
 
 ## Arquitetura
 
-A baseline densa oficial inicial é:
+A implementação aceita uma ou mais camadas ocultas. A baseline densa inicial foi:
 
 ```text
 4096 -> 128 -> 1
 ```
 
-Configuração oficial inicial:
+As baterias posteriores testaram arquiteturas como:
 
 ```text
-Hidden: 128
-Ativação oculta: ReLU
-Saída: sigmoid
-Loss: Binary Cross Entropy
-Batch size: 16
-Learning rate: 0.001
-Épocas: 100
-Seeds: 1, 2, 3, 4, 5, 42
-```
-
-A implementação atual também permite arquiteturas profundas, como:
-
-```text
+4096 -> 64 -> 1
 4096 -> 256 -> 64 -> 1
-4096 -> 512 -> 128 -> 32 -> 1
+4096 -> 128 -> 256 -> 128 -> 1
+4096 -> 256 -> 256 -> 128 -> 1
+4096 -> 512 -> 512 -> 128 -> 1
 ```
 
 No código, isso é representado por `HiddenSizes`, um slice de inteiros. Por exemplo:
@@ -87,7 +77,7 @@ representa:
 4096 -> 256 -> 64 -> 1
 ```
 
-## Forward
+## Forward denso
 
 Cada camada densa calcula:
 
@@ -101,7 +91,7 @@ Os pesos são armazenados em layout input-major:
 Weights[i*Out + o]
 ```
 
-Esse layout é simples para auditar e será útil na futura DSA, pois cada entrada ativa aponta para um bloco contíguo de pesos.
+Esse layout facilita a propagação esparsa porque cada entrada ativa acessa um bloco contíguo de pesos para todos os neurônios da camada seguinte.
 
 Em uma arquitetura com várias camadas ocultas, a saída ativada de cada camada vira a entrada da próxima:
 
@@ -148,72 +138,83 @@ b = b - lr * (dB / batch_size)
 
 Para múltiplas camadas ocultas, o erro é propagado de trás para frente, usando os pesos da camada seguinte e a derivada da ReLU da camada atual.
 
-## Treino e avaliação
+## Dynamic Sparse Activation
 
-A cada época, as amostras de treino são embaralhadas, divididas em mini-batches e usadas para atualizar os pesos. Ao fim da época, o modelo é avaliado em treino e validação.
-
-O melhor checkpoint é escolhido por validação:
-
-1. Maior acurácia de validação.
-2. Em empate, menor loss de validação.
-
-O teste final é feito usando esse melhor checkpoint, não necessariamente o modelo da última época.
-
-## Métricas
-
-Foram implementadas:
-
-- Accuracy.
-- Precision.
-- Recall.
-- F1-score.
-- Matriz de confusão.
-
-A classificação usa threshold 0.5:
+A DSA transforma a saída ReLU de uma camada oculta em uma representação compacta:
 
 ```text
-yHat >= 0.5 -> dog
-yHat < 0.5 -> cat
+ActiveVector:
+  Size    -> tamanho original da camada
+  Indices -> índices dos neurônios ativos
+  Values  -> ativações dos neurônios ativos
 ```
 
-A matriz de confusão é impressa como:
+A camada seguinte é calculada usando apenas as entradas ativas:
 
 ```text
-TN FP
-FN TP
+z_o = b_o + soma_{j ativo}(a_j * W_j,o)
 ```
 
-## Como executar
+Na DSA exact, `threshold = 0`. Apenas ativações exatamente nulas são removidas. Essa versão preserva matematicamente a função da MLP densa.
 
-Treino individual com uma camada oculta:
+Na DSA threshold, `threshold > 0`. Ativações positivas pequenas também são removidas. Essa versão é aproximada e pode alterar loss, predições e métricas.
 
-```bash
-go run ./cmd/train --dataset ./dataset --epochs 100 --hidden 128 --batch 16 --lr 0.001 --run-dir runs/manual_h128
-```
+## Comandos principais
 
-Treino individual com múltiplas camadas ocultas:
+Treino individual:
 
 ```bash
 go run ./cmd/train --dataset ./dataset --epochs 100 --hidden 256x64 --batch 16 --lr 0.001 --run-dir runs/manual_h256x64
 ```
 
-Sweep de experimentos:
+Sweep de experimentos densos:
 
 ```bash
 go run ./cmd/sweep \
   --dataset ./dataset \
   --epochs 100 \
-  --hidden '128;256x64;512x128' \
+  --hidden '64;256x64;128x256x128' \
   --batch '16,32' \
-  --lr '0.001,0.0003' \
+  --lr '0.003,0.001,0.0003' \
   --seeds '1,2,3,4,5,42' \
   --workers 1 \
-  --runs runs/dense_sweep_v1
+  --runs runs/dense_sweep
 ```
 
-Cada execução salva `config.json`, `summary.json`, `metrics.csv`, `confusion_matrix.csv`, `test_predictions.csv` e checkpoints.
+Comparação dense vs DSA:
 
-## Resultados observados da baseline inicial
+```bash
+go run ./cmd/compare \
+  --dataset ./dataset \
+  --hidden 256x64 \
+  --epochs 200 \
+  --batch 16 \
+  --lr 0.003 \
+  --seed 42 \
+  --thresholds "0,0.05,0.1,0.25,0.5" \
+  --runs runs/dsa_compare \
+  --name compare_h256x64_lr003_bs16_seed42
+```
+
+Benchmark de forward:
+
+```bash
+go run ./cmd/bench \
+  --dataset ./dataset \
+  --hidden 256x64 \
+  --epochs 200 \
+  --batch 16 \
+  --lr 0.003 \
+  --seed 42 \
+  --thresholds "0,0.05,0.1,0.25,0.5" \
+  --repeat 500 \
+  --warmup 50 \
+  --gomaxprocs 1 \
+  --runs runs/dsa_bench \
+  --name bench_h256x64_lr003_bs16_seed42
+```
+
+## Resultados da baseline densa inicial
 
 | Seed | Melhor época | Val acc | Test acc | F1 |
 |---:|---:|---:|---:|---:|
@@ -232,16 +233,42 @@ Test accuracy média: 49,7%
 F1 médio: 43,7%
 ```
 
+## Resultados da DSA exact
+
+Resultados no split de teste, com `lr = 0.003`, `batch = 16`, `epochs = 200`, `seed = 42` e benchmark com `repeat = 500`, `warmup = 50`, `gomaxprocs = 1`.
+
+| Arquitetura | Acc | F1 | Sparsity exact | Ops salvas | Dense ns/forward | Sparse exact ns/forward | Ganho real |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `64` | 0.56 | 0.6563 | 53.36% | 0.013% | 251182 | 232240 | 7.54% |
+| `256x64` | 0.59 | 0.6435 | 44.86% | 0.733% | 950254 | 868090 | 8.65% |
+| `128x256x128` | 0.60 | 0.6552 | 47.78% | 5.34% | 526198 | 471552 | 10.38% |
+| `256x256x128` | 0.53 | 0.6240 | 50.21% | 4.35% | 1000383 | 901491 | 9.89% |
+| `512x512x128` | 0.55 | 0.2373 | 47.39% | 6.45% | 2095225 | 1838661 | 12.25% |
+
+Em todas as arquiteturas, a DSA exact manteve `mismatch = 0` e `max_abs_diff_from_dense = 0`. Isso confirma que a propagação esparsa exata preserva a função da MLP densa.
+
+## Resultados de thresholds
+
+A arquitetura `256x64` apresentou o comportamento mais claro para thresholds:
+
+| Threshold | Loss | Acc | F1 | Sparsity | Mismatch |
+|---:|---:|---:|---:|---:|---:|
+| `0` exact | 0.7291 | 0.59 | 0.6435 | 44.86% | 0 |
+| `0.05` | 0.7301 | 0.59 | 0.6435 | 47.44% | 0 |
+| `0.10` | 0.7355 | 0.61 | 0.6549 | 50.02% | 4 |
+| `0.25` | 0.7523 | 0.58 | 0.6250 | 57.76% | 3 |
+| `0.50` | 0.7823 | 0.58 | 0.6250 | 70.05% | 5 |
+
+O threshold `0.05` foi o ponto conservador mais estável nessa arquitetura, pois aumentou a esparsidade sem alterar as predições. O threshold `0.10` foi o resultado experimental mais interessante, pois melhorou acurácia e F1, mas alterou quatro predições e aumentou a loss.
+
 ## Discussão
 
-A MLP mostrou que o pipeline está funcional: o modelo aprende problemas sintéticos simples e reduz loss no treino real. Porém, no dataset de imagens, a acurácia de teste ficou próxima do acaso.
+A MLP mostrou que o pipeline está funcional, mas continua limitada para classificação de imagens vetorizadas. Essa limitação é esperada porque a rede não possui filtros locais, compartilhamento de pesos nem viés espacial, ao contrário de uma CNN.
 
-Esse resultado é coerente com a limitação da MLP sobre imagens vetorizadas. Ao transformar a imagem em um vetor de 4096 valores, relações espaciais importantes são perdidas. A rede não possui filtros locais, compartilhamento de pesos nem viés espacial, ao contrário de uma CNN.
+A DSA exact mostrou que uma fração relevante das ativações ocultas pode ser removida sem alterar a saída. O ganho real de tempo foi maior nas arquiteturas com mais custo em camadas internas, especialmente `128x256x128` e `512x512x128`.
 
-A nova infraestrutura com múltiplas camadas e sweeps permite testar essa limitação com mais rigor, sem misturar resultados soltos ou perder rastreabilidade das configurações.
+Os thresholds positivos criam uma segunda linha experimental: poda dinâmica aproximada em inferência. Essa abordagem pode aumentar esparsidade e, em alguns casos, melhorar métricas discretas, mas não preserva necessariamente a função da rede densa.
 
-## Conclusão parcial
+## Conclusão
 
-A baseline densa inicial está pronta para documentação e comparação. A implementação agora também permite uma bateria de testes densos mais ampla, variando arquitetura, batch size, learning rate e seed.
-
-A próxima etapa será definir uma grade experimental controlada para a MLP densa. Depois disso, a DSA exact sparse poderá ser implementada sobre uma base mais estável e bem registrada.
+A baseline densa está funcional e documentada. A extensão DSA exact preserva a saída da MLP densa e produz ganhos reais de tempo nos benchmarks realizados. A arquitetura `128x256x128` apresentou o melhor equilíbrio entre qualidade, custo e aceleração, enquanto `512x512x128` serviu como melhor stress test computacional. Thresholds moderados, especialmente `0.05` e `0.10`, merecem investigação posterior em baterias com múltiplas seeds.
