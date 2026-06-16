@@ -325,7 +325,7 @@ func evaluateSparse(model *nn.MLP, samples []nn.Sample, split string, threshold 
 		AverageActiveCount:     averageActiveCount,
 		AverageActiveRatio:     averageActiveRatio,
 		AverageSparsity:        averageSparsity,
-		AverageActiveByLayer:   layerActivationSummary(layerActiveTotals, layerSlotTotals),
+		AverageActiveByLayer:   layerActivationSummary(layerActiveTotals, layerSlotTotals, len(samples)),
 		MaxAbsDiffFromDense:    maxAbsDiff,
 		MismatchCountFromDense: mismatchCount,
 	}, nil
@@ -413,18 +413,16 @@ func denseLayerActivationSummary(model *nn.MLP) string {
 	return strings.Join(parts, ";")
 }
 
-func layerActivationSummary(activeTotals, slotTotals []int) string {
+func layerActivationSummary(activeTotals, slotTotals []int, samples int) string {
 	parts := make([]string, 0, len(activeTotals))
 	for i := range activeTotals {
 		averageActive := 0.0
 		averageSlots := 0.0
-		if slotTotals[i] > 0 {
-			// slotTotals[i] is samples * layer_size, so active/slot gives ratio.
-			// Dividing both totals by the inferred number of samples gives average active and size.
-			inferredSamples := float64(slotTotals[i]) / float64(slotTotals[i]/maxInt(slotTotals[i], 1))
-			_ = inferredSamples
+		if samples > 0 {
+			averageActive = float64(activeTotals[i]) / float64(samples)
+			averageSlots = float64(slotTotals[i]) / float64(samples)
 		}
-		parts = append(parts, fmt.Sprintf("L%d=%s/%s", i, formatFloatCompact(float64(activeTotals[i])), formatFloatCompact(float64(slotTotals[i]))))
+		parts = append(parts, fmt.Sprintf("L%d=%.2f/%.0f", i, averageActive, averageSlots))
 	}
 	return strings.Join(parts, ";")
 }
@@ -524,17 +522,6 @@ func formatActivationFraction(active, slots int) string {
 
 func formatFloat(value float64) string {
 	return strconv.FormatFloat(value, 'f', 8, 64)
-}
-
-func formatFloatCompact(value float64) string {
-	return strconv.FormatFloat(value, 'f', 2, 64)
-}
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }
 
 func absFloat64(value float64) float64 {
