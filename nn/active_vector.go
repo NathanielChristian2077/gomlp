@@ -12,6 +12,26 @@ type ActiveVector struct {
 	Values  []float64
 }
 
+func NewActiveVector(size int) ActiveVector {
+	if size < 0 {
+		panic(fmt.Sprintf("invalid active vector size: %d", size))
+	}
+	return ActiveVector{
+		Size:    size,
+		Indices: make([]int, 0, size),
+		Values:  make([]float64, 0, size),
+	}
+}
+
+func (v *ActiveVector) Reset(size int) {
+	if size < 0 {
+		panic(fmt.Sprintf("invalid active vector size: %d", size))
+	}
+	v.Size = size
+	v.Indices = v.Indices[:0]
+	v.Values = v.Values[:0]
+}
+
 func (v ActiveVector) ActiveCount() int {
 	return len(v.Indices)
 }
