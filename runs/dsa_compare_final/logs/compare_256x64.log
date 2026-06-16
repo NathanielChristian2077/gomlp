@@ -1,0 +1,14 @@
+run_id=ac9d07b91384 run_dir=runs/dsa_compare_final/ac9d07b91384_compare_h256x64_lr003_bs16_seed42 best_epoch=88 split=test samples=100 out=runs/dsa_compare_final/compare_256x64.csv
+mode               threshold  loss       acc        precision  recall     f1         ms           speedup      active         avg_active   sparsity   mismatch  
+dense              0          0.729093   0.5900     0.5692     0.7400     0.6435     92           1.0000       32000/32000    160.0000     0.0000     0         
+  activations_by_layer: L0=256.00/256;L1=64.00/64
+sparse_exact       0          0.729093   0.5900     0.5692     0.7400     0.6435     85           1.0074       17645/32000    88.2250      0.4486     0         
+  activations_by_layer: L0=134.35/256;L1=42.10/64
+sparse_threshold   0.05       0.730114   0.5900     0.5692     0.7400     0.6435     95           1.0078       16818/32000    84.0900      0.4744     0         
+  activations_by_layer: L0=127.55/256;L1=40.63/64
+sparse_threshold   0.1        0.735539   0.6100     0.5873     0.7400     0.6549     88           1.0082       15994/32000    79.9700      0.5002     4         
+  activations_by_layer: L0=120.77/256;L1=39.17/64
+sparse_threshold   0.25       0.752307   0.5800     0.5645     0.7000     0.6250     91           1.0094       13517/32000    67.5850      0.5776     3         
+  activations_by_layer: L0=101.20/256;L1=33.97/64
+sparse_threshold   0.5        0.782347   0.5800     0.5645     0.7000     0.6250     93           1.0113       9584/32000     47.9200      0.7005     5         
+  activations_by_layer: L0=71.04/256;L1=24.80/64

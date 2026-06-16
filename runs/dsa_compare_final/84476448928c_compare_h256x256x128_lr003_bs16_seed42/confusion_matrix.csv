@@ -1,0 +1,9 @@
+metric,value
+true_negative,14
+false_positive,36
+false_negative,11
+true_positive,39
+accuracy,0.53000000
+precision,0.52000000
+recall,0.78000000
+f1,0.62400000

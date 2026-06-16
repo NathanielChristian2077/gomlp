@@ -1,0 +1,23 @@
+{
+  "run_id": "bc38f72de169",
+  "name": "compare_h512x512x128_lr003_bs16_seed42",
+  "run_directory": "runs/dsa_compare_final/bc38f72de169_compare_h512x512x128_lr003_bs16_seed42",
+  "completed": true,
+  "loaded_from_summary": false,
+  "best_epoch": 41,
+  "best_validation_loss": 0.8734577014905552,
+  "best_validation_accuracy": 0.57,
+  "test_loss": 0.8212299232516989,
+  "test_accuracy": 0.55,
+  "test_precision": 0.7777777777777778,
+  "test_recall": 0.14,
+  "test_f1": 0.23728813559322035,
+  "confusion": {
+    "TruePositive": 7,
+    "TrueNegative": 48,
+    "FalsePositive": 2,
+    "FalseNegative": 43
+  },
+  "train_time_ms": 445044,
+  "epochs_run": 200
+}

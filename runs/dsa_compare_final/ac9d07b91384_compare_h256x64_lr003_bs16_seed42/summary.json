@@ -1,0 +1,23 @@
+{
+  "run_id": "ac9d07b91384",
+  "name": "compare_h256x64_lr003_bs16_seed42",
+  "run_directory": "runs/dsa_compare_final/ac9d07b91384_compare_h256x64_lr003_bs16_seed42",
+  "completed": true,
+  "loaded_from_summary": false,
+  "best_epoch": 88,
+  "best_validation_loss": 0.8851104640129452,
+  "best_validation_accuracy": 0.63,
+  "test_loss": 0.7290932336399564,
+  "test_accuracy": 0.59,
+  "test_precision": 0.5692307692307692,
+  "test_recall": 0.74,
+  "test_f1": 0.6434782608695652,
+  "confusion": {
+    "TruePositive": 37,
+    "TrueNegative": 22,
+    "FalsePositive": 28,
+    "FalseNegative": 13
+  },
+  "train_time_ms": 189700,
+  "epochs_run": 200
+}
