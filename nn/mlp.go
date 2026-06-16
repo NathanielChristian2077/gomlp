@@ -46,6 +46,46 @@ func (s SparseForwardStats) EstimatedSpeedup() float64 {
 	return float64(s.DenseOps) / float64(s.SparseOps)
 }
 
+// SparseForwardWorkspace guarda buffers reutilizáveis para forward esparso.
+// Ele evita alocações repetidas de ActiveVector durante benchmarks e inferência.
+type SparseForwardWorkspace struct {
+	Active      []ActiveVector
+	HiddenStats []SparseActivationStats
+}
+
+func NewSparseForwardWorkspace(model *MLP) *SparseForwardWorkspace {
+	if model == nil || len(model.Hidden) == 0 {
+		panic("cannot create sparse workspace for nil or empty model")
+	}
+
+	active := make([]ActiveVector, len(model.Hidden))
+	for i, layer := range model.Hidden {
+		active[i] = NewActiveVector(layer.Out)
+	}
+
+	return &SparseForwardWorkspace{
+		Active:      active,
+		HiddenStats: make([]SparseActivationStats, 0, len(model.Hidden)),
+	}
+}
+
+func (w *SparseForwardWorkspace) mustMatchModel(model *MLP) {
+	if w == nil {
+		panic("nil sparse forward workspace")
+	}
+	if model == nil || len(model.Hidden) == 0 {
+		panic("invalid model for sparse forward workspace")
+	}
+	if len(w.Active) != len(model.Hidden) {
+		panic(fmt.Sprintf("invalid sparse workspace hidden count: expected %d got %d", len(model.Hidden), len(w.Active)))
+	}
+	for i, layer := range model.Hidden {
+		if cap(w.Active[i].Indices) < layer.Out || cap(w.Active[i].Values) < layer.Out {
+			w.Active[i] = NewActiveVector(layer.Out)
+		}
+	}
+}
+
 // NewMLP preserva a API da baseline original de uma camada oculta.
 func NewMLP(inputSize, hiddenSize int, seed int64) *MLP {
 	return NewMLPWithHiddenSizes(inputSize, []int{hiddenSize}, seed)
@@ -153,41 +193,68 @@ func (m *MLP) Forward(x []float64) float64 {
 // ForwardSparseExact calcula a saída usando propagação esparsa dinâmica exata.
 // Apenas ativações ReLU exatamente nulas são removidas, preservando a saída da MLP densa.
 func (m *MLP) ForwardSparseExact(x []float64) float64 {
-	yHat, _ := m.ForwardSparseWithStats(x, 0)
-	return yHat
+	workspace := NewSparseForwardWorkspace(m)
+	return m.ForwardSparseFast(x, 0, workspace)
+}
+
+// ForwardSparseFast calcula a saída esparsa sem produzir métricas.
+// Use este método para benchmark de inferência, reutilizando workspace entre amostras.
+func (m *MLP) ForwardSparseFast(x []float64, threshold float64, workspace *SparseForwardWorkspace) float64 {
+	workspace.mustMatchModel(m)
+
+	firstLayer := &m.Hidden[0]
+	firstLayer.Forward(x, m.HiddenZ[0])
+	ReLUToActiveInto(m.HiddenZ[0], threshold, &workspace.Active[0])
+
+	for layerIndex := 1; layerIndex < len(m.Hidden); layerIndex++ {
+		layer := &m.Hidden[layerIndex]
+		layer.ForwardSparse(workspace.Active[layerIndex-1], m.HiddenZ[layerIndex])
+		ReLUToActiveInto(m.HiddenZ[layerIndex], threshold, &workspace.Active[layerIndex])
+	}
+
+	m.Output.ForwardSparse(workspace.Active[len(m.Hidden)-1], m.OutputZ)
+	return Sigmoid(m.OutputZ[0])
 }
 
 // ForwardSparseWithStats calcula a saída usando propagação esparsa dinâmica.
 // threshold=0 corresponde à DSA exata. Thresholds positivos geram uma aproximação
 // experimental, removendo também ativações positivas pequenas.
 func (m *MLP) ForwardSparseWithStats(x []float64, threshold float64) (float64, SparseForwardStats) {
-	stats := SparseForwardStats{
-		Hidden: make([]SparseActivationStats, 0, len(m.Hidden)),
-	}
+	workspace := NewSparseForwardWorkspace(m)
+	return m.ForwardSparseWithStatsWorkspace(x, threshold, workspace)
+}
+
+// ForwardSparseWithStatsWorkspace é a versão instrumentada com buffers reutilizáveis.
+// Os slices de stats retornados são válidos até a próxima chamada usando o mesmo workspace.
+func (m *MLP) ForwardSparseWithStatsWorkspace(x []float64, threshold float64, workspace *SparseForwardWorkspace) (float64, SparseForwardStats) {
+	workspace.mustMatchModel(m)
+	workspace.HiddenStats = workspace.HiddenStats[:0]
+
+	stats := SparseForwardStats{}
 
 	firstLayer := &m.Hidden[0]
 	firstLayer.Forward(x, m.HiddenZ[0])
 	stats.DenseOps += estimateDenseOps(*firstLayer)
 	stats.SparseOps += estimateDenseOps(*firstLayer)
 
-	active := ReLUToActive(m.HiddenZ[0], threshold)
-	active.WriteDense(m.HiddenA[0])
-	stats.Hidden = append(stats.Hidden, sparseActivationStats(0, active))
+	ReLUToActiveInto(m.HiddenZ[0], threshold, &workspace.Active[0])
+	workspace.HiddenStats = append(workspace.HiddenStats, sparseActivationStats(0, workspace.Active[0]))
 
 	for layerIndex := 1; layerIndex < len(m.Hidden); layerIndex++ {
 		layer := &m.Hidden[layerIndex]
-		layer.ForwardSparse(active, m.HiddenZ[layerIndex])
+		layer.ForwardSparse(workspace.Active[layerIndex-1], m.HiddenZ[layerIndex])
 		stats.DenseOps += estimateDenseOps(*layer)
-		stats.SparseOps += estimateSparseOps(active, layer.Out)
+		stats.SparseOps += estimateSparseOps(workspace.Active[layerIndex-1], layer.Out)
 
-		active = ReLUToActive(m.HiddenZ[layerIndex], threshold)
-		active.WriteDense(m.HiddenA[layerIndex])
-		stats.Hidden = append(stats.Hidden, sparseActivationStats(layerIndex, active))
+		ReLUToActiveInto(m.HiddenZ[layerIndex], threshold, &workspace.Active[layerIndex])
+		workspace.HiddenStats = append(workspace.HiddenStats, sparseActivationStats(layerIndex, workspace.Active[layerIndex]))
 	}
 
-	m.Output.ForwardSparse(active, m.OutputZ)
+	lastActive := workspace.Active[len(m.Hidden)-1]
+	m.Output.ForwardSparse(lastActive, m.OutputZ)
 	stats.DenseOps += estimateDenseOps(m.Output)
-	stats.SparseOps += estimateSparseOps(active, m.Output.Out)
+	stats.SparseOps += estimateSparseOps(lastActive, m.Output.Out)
+	stats.Hidden = workspace.HiddenStats
 
 	return Sigmoid(m.OutputZ[0]), stats
 }
