@@ -4,8 +4,6 @@ import "math"
 
 // ReLU aplica a função de ativação da camada oculta.
 // Valores negativos são zerados e valores positivos passam sem alteração.
-// Essa ativação também é o ponto que futuramente permitirá observar sparsity,
-// pois neurônios com saída exatamente zero podem ser ignorados na DSA.
 func ReLU(x float64) float64 {
 	if x > 0 {
 		return x
