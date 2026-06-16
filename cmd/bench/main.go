@@ -17,24 +17,24 @@ import (
 )
 
 type benchResult struct {
-	Mode                 string
-	Threshold            float64
-	Split                string
-	Samples              int
-	Repeats              int
-	TotalForwards        int
-	TotalMilliseconds    int64
-	NanosecondsPerForward float64
-	ForwardsPerSecond    float64
-	Checksum             float64
-	DenseOpsPerPass      int
-	SparseOpsPerPass     int
-	EstimatedSpeedup     float64
-	ActiveTotalPerPass   int
+	Mode                   string
+	Threshold              float64
+	Split                  string
+	Samples                int
+	Repeats                int
+	TotalForwards          int
+	TotalMilliseconds      int64
+	NanosecondsPerForward  float64
+	ForwardsPerSecond      float64
+	Checksum               float64
+	DenseOpsPerPass        int
+	SparseOpsPerPass       int
+	EstimatedSpeedup       float64
+	ActiveTotalPerPass     int
 	ActivationSlotsPerPass int
-	AverageActiveRatio   float64
-	AverageSparsity      float64
-	AverageActiveByLayer string
+	AverageActiveRatio     float64
+	AverageSparsity        float64
+	AverageActiveByLayer   string
 }
 
 func main() {
@@ -195,7 +195,7 @@ func warmupDense(model *nn.MLP, samples []nn.Sample, passes int) float64 {
 	checksum := 0.0
 	for pass := 0; pass < passes; pass++ {
 		for _, sample := range samples {
-			checksum += model.Forward(sample.X)
+			checksum += model.ForwardFast(sample.X)
 		}
 	}
 	return checksum
@@ -207,7 +207,7 @@ func benchmarkDense(model *nn.MLP, samples []nn.Sample, split string, repeats in
 	checksum := 0.0
 	for pass := 0; pass < repeats; pass++ {
 		for _, sample := range samples {
-			checksum += model.Forward(sample.X)
+			checksum += model.ForwardFast(sample.X)
 		}
 	}
 	duration := time.Since(startedAt)
@@ -242,7 +242,7 @@ func warmupSparse(model *nn.MLP, samples []nn.Sample, threshold float64, passes 
 	checksum := 0.0
 	for pass := 0; pass < passes; pass++ {
 		for _, sample := range samples {
-			checksum += model.ForwardSparseFast(sample.X, threshold, workspace)
+			checksum += model.ForwardSparsePrepared(sample.X, threshold, workspace)
 		}
 	}
 	return checksum
@@ -255,7 +255,7 @@ func benchmarkSparse(model *nn.MLP, samples []nn.Sample, split string, threshold
 	checksum := 0.0
 	for pass := 0; pass < repeats; pass++ {
 		for _, sample := range samples {
-			checksum += model.ForwardSparseFast(sample.X, threshold, workspace)
+			checksum += model.ForwardSparsePrepared(sample.X, threshold, workspace)
 		}
 	}
 	duration := time.Since(startedAt)
@@ -290,13 +290,13 @@ func benchmarkSparse(model *nn.MLP, samples []nn.Sample, split string, threshold
 }
 
 type sparseStatsSummary struct {
-	DenseOpsPerPass    int
-	SparseOpsPerPass   int
-	EstimatedSpeedup   float64
-	ActiveTotal        int
-	ActivationSlots    int
-	AverageActiveRatio float64
-	AverageSparsity    float64
+	DenseOpsPerPass      int
+	SparseOpsPerPass     int
+	EstimatedSpeedup     float64
+	ActiveTotal          int
+	ActivationSlots      int
+	AverageActiveRatio   float64
+	AverageSparsity      float64
 	AverageActiveByLayer string
 }
 
