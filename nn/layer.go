@@ -71,7 +71,10 @@ func (l DenseLayer) Clone() DenseLayer {
 func (l *DenseLayer) Forward(input, output []float64) {
 	l.mustMatchInput(input, "forward input")
 	l.mustMatchOutput(output, "forward output")
+	l.forwardUnchecked(input, output)
+}
 
+func (l *DenseLayer) forwardUnchecked(input, output []float64) {
 	copy(output, l.Biases)
 
 	for i := 0; i < l.In; i++ {
@@ -89,7 +92,10 @@ func (l *DenseLayer) Forward(input, output []float64) {
 func (l *DenseLayer) ForwardSparse(input ActiveVector, output []float64) {
 	input.mustMatchSize(l.In, "sparse forward input")
 	l.mustMatchOutput(output, "sparse forward output")
+	l.forwardSparseUnchecked(input, output)
+}
 
+func (l *DenseLayer) forwardSparseUnchecked(input ActiveVector, output []float64) {
 	copy(output, l.Biases)
 
 	for k, j := range input.Indices {
