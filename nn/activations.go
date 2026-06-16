@@ -13,7 +13,7 @@ func ReLU(x float64) float64 {
 	return 0
 }
 
-func ReLUToActive(z []float64) ActiveVector {
+func ReLUToActive(z []float64, threshold float64) ActiveVector {
 	idx := make([]int, 0, len(z))
 	values := make([]float64, 0, len(z))
 
@@ -25,9 +25,9 @@ func ReLUToActive(z []float64) ActiveVector {
 	}
 
 	return ActiveVector{
-		Size:   len(z),
-		Idx:    idx,
-		Values: values,
+		Size:    len(z),
+		Indices: idx,
+		Values:  values,
 	}
 }
 

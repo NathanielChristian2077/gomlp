@@ -22,9 +22,9 @@ type DenseLayer struct {
 }
 
 type ActiveVector struct {
-	Size   int
-	Idx    []int
-	Values []float64
+	Size    int
+	Indices []int
+	Values  []float64
 }
 
 // NewDenseLayer cria uma camada densa com inicialização He.
@@ -90,16 +90,28 @@ func (l *DenseLayer) Forward(input, output []float64) {
 	}
 }
 
-func (l *DenseLayer) ForwardSparse(input ActiveVector, z []float64) {
-	copy(z, l.Biases)
+func (l *DenseLayer) ForwardSparse(input ActiveVector, output []float64) {
+	if input.Size != l.In {
+		panic(fmt.Sprintf("invalid sparse forward input size: expected %d, got %d", l.In, input.Size))
+	}
+	if len(input.Indices) != len(input.Values) {
+		panic(fmt.Sprintf("invalid active vector: %d indices for %d values", len(input.Indices), len(input.Values)))
+	}
 
-	for k, j := range input.Idx {
+	l.mustMatchOutput(output, "sparse forward output")
+
+	copy(output, l.Biases)
+
+	for k, j := range input.Indices {
+		if j < 0 || j >= l.In {
+			panic(fmt.Sprintf("active index out of range: index=%d input_size=%d", j, l.In))
+		}
+
 		x := input.Values[k]
-
 		base := j * l.Out
 
 		for o := 0; o < l.Out; o++ {
-			z[o] += x * l.Weights[base+o]
+			output[o] += x * l.Weights[base+o]
 		}
 	}
 }
