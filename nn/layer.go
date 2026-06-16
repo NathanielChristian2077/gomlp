@@ -21,12 +21,6 @@ type DenseLayer struct {
 	GradB []float64
 }
 
-type ActiveVector struct {
-	Size    int
-	Indices []int
-	Values  []float64
-}
-
 // NewDenseLayer cria uma camada densa com inicialização He.
 // A escala sqrt(2/in) é adequada para camadas que usam ReLU,
 // ajudando a manter a magnitude das ativações mais estável no início do treino.
@@ -90,23 +84,15 @@ func (l *DenseLayer) Forward(input, output []float64) {
 	}
 }
 
+// ForwardSparse calcula z = xW + b usando apenas as entradas ativas.
+// Os índices do ActiveVector devem corresponder às posições originais do vetor denso.
 func (l *DenseLayer) ForwardSparse(input ActiveVector, output []float64) {
-	if input.Size != l.In {
-		panic(fmt.Sprintf("invalid sparse forward input size: expected %d, got %d", l.In, input.Size))
-	}
-	if len(input.Indices) != len(input.Values) {
-		panic(fmt.Sprintf("invalid active vector: %d indices for %d values", len(input.Indices), len(input.Values)))
-	}
-
+	input.mustMatchSize(l.In, "sparse forward input")
 	l.mustMatchOutput(output, "sparse forward output")
 
 	copy(output, l.Biases)
 
 	for k, j := range input.Indices {
-		if j < 0 || j >= l.In {
-			panic(fmt.Sprintf("active index out of range: index=%d input_size=%d", j, l.In))
-		}
-
 		x := input.Values[k]
 		base := j * l.Out
 
@@ -139,6 +125,26 @@ func (l *DenseLayer) AccumulateGrad(input []float64, deltaOut []float64) {
 
 	for i := 0; i < l.In; i++ {
 		x := input[i]
+		base := i * l.Out
+
+		for o := 0; o < l.Out; o++ {
+			l.GradW[base+o] += x * deltaOut[o]
+		}
+	}
+}
+
+// AccumulateGradSparse acumula gradientes usando apenas entradas ativas.
+// Ele é equivalente ao gradiente denso quando as entradas inativas são exatamente zero.
+func (l *DenseLayer) AccumulateGradSparse(input ActiveVector, deltaOut []float64) {
+	input.mustMatchSize(l.In, "sparse gradient input")
+	l.mustMatchOutput(deltaOut, "sparse gradient delta")
+
+	for o := 0; o < l.Out; o++ {
+		l.GradB[o] += deltaOut[o]
+	}
+
+	for k, i := range input.Indices {
+		x := input.Values[k]
 		base := i * l.Out
 
 		for o := 0; o < l.Out; o++ {
