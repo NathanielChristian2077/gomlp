@@ -20,6 +20,32 @@ type MLP struct {
 	DeltaOutput []float64
 }
 
+// SparseActivationStats resume a esparsidade observada em uma camada oculta.
+type SparseActivationStats struct {
+	LayerIndex  int
+	Size        int
+	Active      int
+	ActiveRatio float64
+	Sparsity    float64
+}
+
+// SparseForwardStats resume o custo estimado de um forward esparso.
+// DenseOps e SparseOps contam multiplicações de camadas lineares.
+// A primeira camada oculta continua densa nesta fase, pois a imagem de entrada
+// ainda é tratada como vetor denso.
+type SparseForwardStats struct {
+	Hidden    []SparseActivationStats
+	DenseOps  int
+	SparseOps int
+}
+
+func (s SparseForwardStats) EstimatedSpeedup() float64 {
+	if s.SparseOps == 0 {
+		return 0
+	}
+	return float64(s.DenseOps) / float64(s.SparseOps)
+}
+
 // NewMLP preserva a API da baseline original de uma camada oculta.
 func NewMLP(inputSize, hiddenSize int, seed int64) *MLP {
 	return NewMLPWithHiddenSizes(inputSize, []int{hiddenSize}, seed)
@@ -124,6 +150,48 @@ func (m *MLP) Forward(x []float64) float64 {
 	return Sigmoid(m.OutputZ[0])
 }
 
+// ForwardSparseExact calcula a saída usando propagação esparsa dinâmica exata.
+// Apenas ativações ReLU exatamente nulas são removidas, preservando a saída da MLP densa.
+func (m *MLP) ForwardSparseExact(x []float64) float64 {
+	yHat, _ := m.ForwardSparseWithStats(x, 0)
+	return yHat
+}
+
+// ForwardSparseWithStats calcula a saída usando propagação esparsa dinâmica.
+// threshold=0 corresponde à DSA exata. Thresholds positivos geram uma aproximação
+// experimental, removendo também ativações positivas pequenas.
+func (m *MLP) ForwardSparseWithStats(x []float64, threshold float64) (float64, SparseForwardStats) {
+	stats := SparseForwardStats{
+		Hidden: make([]SparseActivationStats, 0, len(m.Hidden)),
+	}
+
+	firstLayer := &m.Hidden[0]
+	firstLayer.Forward(x, m.HiddenZ[0])
+	stats.DenseOps += estimateDenseOps(*firstLayer)
+	stats.SparseOps += estimateDenseOps(*firstLayer)
+
+	active := ReLUToActive(m.HiddenZ[0], threshold)
+	active.WriteDense(m.HiddenA[0])
+	stats.Hidden = append(stats.Hidden, sparseActivationStats(0, active))
+
+	for layerIndex := 1; layerIndex < len(m.Hidden); layerIndex++ {
+		layer := &m.Hidden[layerIndex]
+		layer.ForwardSparse(active, m.HiddenZ[layerIndex])
+		stats.DenseOps += estimateDenseOps(*layer)
+		stats.SparseOps += estimateSparseOps(active, layer.Out)
+
+		active = ReLUToActive(m.HiddenZ[layerIndex], threshold)
+		active.WriteDense(m.HiddenA[layerIndex])
+		stats.Hidden = append(stats.Hidden, sparseActivationStats(layerIndex, active))
+	}
+
+	m.Output.ForwardSparse(active, m.OutputZ)
+	stats.DenseOps += estimateDenseOps(m.Output)
+	stats.SparseOps += estimateSparseOps(active, m.Output.Out)
+
+	return Sigmoid(m.OutputZ[0]), stats
+}
+
 // Backward acumula os gradientes de uma amostra.
 // Com sigmoid + Binary Cross Entropy, o delta da saída é yHat - y.
 func (m *MLP) Backward(x []float64, yHat, y float64) {
@@ -177,6 +245,24 @@ func (m *MLP) ApplyGrad(lr float64, batchSize int) {
 		m.Hidden[i].ApplyGrad(lr, batchSize)
 	}
 	m.Output.ApplyGrad(lr, batchSize)
+}
+
+func estimateDenseOps(layer DenseLayer) int {
+	return layer.In * layer.Out
+}
+
+func estimateSparseOps(input ActiveVector, outputSize int) int {
+	return input.ActiveCount() * outputSize
+}
+
+func sparseActivationStats(layerIndex int, active ActiveVector) SparseActivationStats {
+	return SparseActivationStats{
+		LayerIndex:  layerIndex,
+		Size:        active.Size,
+		Active:      active.ActiveCount(),
+		ActiveRatio: active.ActiveRatio(),
+		Sparsity:    active.Sparsity(),
+	}
 }
 
 func cloneDenseLayerSlice(layers []DenseLayer) []DenseLayer {
