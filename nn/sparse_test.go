@@ -14,11 +14,39 @@ func TestReLUToActivePreservesPositiveIndices(t *testing.T) {
 		t.Fatalf("expected active vector size %d, got %d", len(z), active.Size)
 	}
 
-	expectedIdx := []int{2, 4, 6}
+	expectedIndices := []int{2, 4, 6}
 	expectedValues := []float64{1.5, 3.25, 0.01}
 
-	assertIntSlicesEqual(t, active.Indices, expectedIdx)
+	assertIntSlicesEqual(t, active.Indices, expectedIndices)
 	assertFloatSlicesClose(t, active.Values, expectedValues, 0)
+}
+
+func TestReLUToActiveAppliesThreshold(t *testing.T) {
+	z := []float64{-1.0, 0.0, 0.10, 0.50, 1.25}
+
+	active := ReLUToActive(z, 0.25)
+
+	assertIntSlicesEqual(t, active.Indices, []int{3, 4})
+	assertFloatSlicesClose(t, active.Values, []float64{0.50, 1.25}, 0)
+}
+
+func TestReLUToActivePanicsForNegativeThreshold(t *testing.T) {
+	assertPanics(t, func() {
+		ReLUToActive([]float64{1.0}, -0.1)
+	})
+}
+
+func TestActiveVectorWritesDenseRepresentation(t *testing.T) {
+	active := ActiveVector{
+		Size:    5,
+		Indices: []int{1, 3},
+		Values:  []float64{2.5, 4.5},
+	}
+
+	out := []float64{9, 9, 9, 9, 9}
+	active.WriteDense(out)
+
+	assertFloatSlicesClose(t, out, []float64{0, 2.5, 0, 4.5, 0}, 0)
 }
 
 func TestForwardSparseMatchesDenseForwardAfterReLU(t *testing.T) {
@@ -95,6 +123,92 @@ func TestForwardSparseOverwritesPreviousOutputValues(t *testing.T) {
 	assertFloatSlicesClose(t, secondOutput, firstOutput, 0)
 }
 
+func TestForwardSparsePanicsForInvalidActiveVector(t *testing.T) {
+	layer := DenseLayer{In: 2, Out: 1, Weights: []float64{1, 2}, Biases: []float64{0}}
+
+	assertPanics(t, func() {
+		layer.ForwardSparse(ActiveVector{Size: 3, Indices: []int{0}, Values: []float64{1}}, []float64{0})
+	})
+
+	assertPanics(t, func() {
+		layer.ForwardSparse(ActiveVector{Size: 2, Indices: []int{0, 1}, Values: []float64{1}}, []float64{0})
+	})
+
+	assertPanics(t, func() {
+		layer.ForwardSparse(ActiveVector{Size: 2, Indices: []int{2}, Values: []float64{1}}, []float64{0})
+	})
+}
+
+func TestAccumulateGradSparseMatchesDenseGradientAfterReLU(t *testing.T) {
+	denseLayer := DenseLayer{
+		In:      4,
+		Out:     2,
+		Weights: []float64{0.2, -0.3, 0.4, 0.5, -0.6, 0.7, 0.8, -0.9},
+		Biases:  []float64{0.1, -0.2},
+		GradW:   make([]float64, 8),
+		GradB:   make([]float64, 2),
+	}
+	sparseLayer := denseLayer.Clone()
+
+	preActivation := []float64{-1.0, 2.0, 0.0, 3.0}
+	activeInput := ReLUToActive(preActivation, 0)
+	denseInput := activeInput.ToDense()
+	deltaOut := []float64{0.4, -0.6}
+
+	denseLayer.AccumulateGrad(denseInput, deltaOut)
+	sparseLayer.AccumulateGradSparse(activeInput, deltaOut)
+
+	assertFloatSlicesClose(t, sparseLayer.GradW, denseLayer.GradW, 1e-12)
+	assertFloatSlicesClose(t, sparseLayer.GradB, denseLayer.GradB, 1e-12)
+}
+
+func TestMLPForwardSparseExactMatchesDenseForward(t *testing.T) {
+	model := NewMLPWithHiddenSizes(4, []int{5, 3}, 11)
+	x := []float64{0.1, -0.2, 0.7, 1.0}
+
+	denseYHat := model.Forward(x)
+	sparseYHat := model.ForwardSparseExact(x)
+
+	if diff := math.Abs(sparseYHat - denseYHat); diff > 1e-12 {
+		t.Fatalf("expected sparse exact forward to match dense forward: dense=%.12f sparse=%.12f diff=%.12f", denseYHat, sparseYHat, diff)
+	}
+}
+
+func TestMLPForwardSparseStatsCaptureSparsityAndOps(t *testing.T) {
+	model := NewMLPWithHiddenSizes(4, []int{5, 3}, 11)
+	x := []float64{0.1, -0.2, 0.7, 1.0}
+
+	_, stats := model.ForwardSparseWithStats(x, 0)
+
+	if len(stats.Hidden) != 2 {
+		t.Fatalf("expected stats for 2 hidden layers, got %d", len(stats.Hidden))
+	}
+
+	if stats.DenseOps != 38 {
+		t.Fatalf("expected 38 dense ops, got %d", stats.DenseOps)
+	}
+
+	if stats.SparseOps <= 0 || stats.SparseOps > stats.DenseOps {
+		t.Fatalf("expected sparse ops in range [1, %d], got %d", stats.DenseOps, stats.SparseOps)
+	}
+
+	if stats.EstimatedSpeedup() < 1 {
+		t.Fatalf("expected estimated speedup >= 1, got %.6f", stats.EstimatedSpeedup())
+	}
+
+	for _, layerStats := range stats.Hidden {
+		if layerStats.Active < 0 || layerStats.Active > layerStats.Size {
+			t.Fatalf("invalid active count for layer %d: active=%d size=%d", layerStats.LayerIndex, layerStats.Active, layerStats.Size)
+		}
+		if layerStats.ActiveRatio < 0 || layerStats.ActiveRatio > 1 {
+			t.Fatalf("invalid active ratio for layer %d: %.6f", layerStats.LayerIndex, layerStats.ActiveRatio)
+		}
+		if layerStats.Sparsity < 0 || layerStats.Sparsity > 1 {
+			t.Fatalf("invalid sparsity for layer %d: %.6f", layerStats.LayerIndex, layerStats.Sparsity)
+		}
+	}
+}
+
 func assertIntSlicesEqual(t *testing.T, actual, expected []int) {
 	t.Helper()
 
@@ -122,4 +236,16 @@ func assertFloatSlicesClose(t *testing.T, actual, expected []float64, tolerance 
 			t.Fatalf("index %d: expected %.12f, got %.12f, diff %.12f > tolerance %.12f", i, expected[i], actual[i], diff, tolerance)
 		}
 	}
+}
+
+func assertPanics(t *testing.T, fn func()) {
+	t.Helper()
+
+	defer func() {
+		if recovered := recover(); recovered == nil {
+			t.Fatalf("expected panic")
+		}
+	}()
+
+	fn()
 }
