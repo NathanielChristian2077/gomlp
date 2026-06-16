@@ -18,24 +18,26 @@ func ReLU(x float64) float64 {
 // ao vetor denso após ReLU, apenas removendo entradas exatamente nulas.
 // Thresholds positivos são aproximados e devem ser tratados como experimento separado.
 func ReLUToActive(z []float64, threshold float64) ActiveVector {
+	active := NewActiveVector(len(z))
+	ReLUToActiveInto(z, threshold, &active)
+	return active
+}
+
+// ReLUToActiveInto reaproveita os buffers de out para evitar alocações por amostra.
+func ReLUToActiveInto(z []float64, threshold float64, out *ActiveVector) {
 	if threshold < 0 {
 		panic("activation threshold must be non-negative")
 	}
-
-	indices := make([]int, 0, len(z))
-	values := make([]float64, 0, len(z))
-
-	for i, v := range z {
-		if v > threshold {
-			indices = append(indices, i)
-			values = append(values, v)
-		}
+	if out == nil {
+		panic("nil active vector output")
 	}
 
-	return ActiveVector{
-		Size:    len(z),
-		Indices: indices,
-		Values:  values,
+	out.Reset(len(z))
+	for i, v := range z {
+		if v > threshold {
+			out.Indices = append(out.Indices, i)
+			out.Values = append(out.Values, v)
+		}
 	}
 }
 
