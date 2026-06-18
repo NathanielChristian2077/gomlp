@@ -1,8 +1,8 @@
-# MLP Manual em Go com Dynamic Sparse Activation
+# MLP Manual em Go com Dynamic Sparse Activation e Ensembles
 
-Este branch contém a implementação manual da MLP densa em Go e uma extensão experimental de Dynamic Sparse Activation, DSA. A ideia é manter a baseline densa auditável e, sobre ela, avaliar uma forma de propagação esparsa induzida pela ReLU.
+Este branch contém a implementação manual da MLP densa em Go, uma extensão experimental de Dynamic Sparse Activation, DSA, e um comando para avaliação de ensembles de checkpoints. A ideia é manter a baseline densa auditável e, sobre ela, avaliar propagação esparsa e agregação de múltiplas redes.
 
-A proposta deste branch é complementar a apresentação principal do trabalho. Ele mantém a MLP manual como base, mas inclui resultados e comandos para comparar a propagação densa com uma propagação esparsa exata e com thresholds aproximados.
+A proposta deste branch é complementar a apresentação principal do trabalho. Ele mantém a MLP manual como base, mas inclui resultados e comandos para comparar a propagação densa com uma propagação esparsa exata, thresholds aproximados e ensembles de modelos já treinados.
 
 ## Estrutura atual
 
@@ -11,6 +11,7 @@ cmd/train/      Executa um treino individual
 cmd/sweep/      Executa uma grade de experimentos densos
 cmd/compare/    Compara dense, sparse exact e sparse threshold em métricas de classificação
 cmd/bench/      Mede tempo puro de forward dense e sparse com warmup e repetição
+cmd/ensemble/   Avalia ensembles a partir de checkpoints treinados
 experiment/     Runner, configs, checkpoints e persistência de resultados
 data/           Loader do dataset e pré-processamento das imagens
 metrics/        Métricas, matriz de confusão e logger CSV
@@ -137,6 +138,20 @@ z_o = b_o + soma_{j ativo}(a_j * W_j,o)
 
 Na DSA com threshold, `threshold > 0`. Ativações positivas pequenas também são removidas. Essa versão é aproximada e pode alterar loss, predições e métricas.
 
+## Ensembles
+
+O comando `cmd/ensemble` carrega múltiplos checkpoints e combina suas predições no mesmo split do dataset.
+
+Ele calcula três modos de decisão:
+
+```text
+ensemble_mean      média simples das probabilidades
+ensemble_weighted  média ponderada das probabilidades
+ensemble_vote      voto majoritário convertido em proporção de votos positivos
+```
+
+Também registra a incerteza por amostra usando desvio padrão, mínimo, máximo e quantidade de votos positivos entre os modelos.
+
 ## Como rodar
 
 Treino individual:
@@ -199,6 +214,30 @@ go run ./cmd/bench \
   --name bench_h256x64_lr003_bs16_seed42
 ```
 
+Ensemble por glob de checkpoints:
+
+```bash
+go run ./cmd/ensemble \
+  --dataset ./dataset \
+  --checkpoint-glob 'runs/dense_sweep_v3_finalists/*/checkpoints/best.gob' \
+  --split test \
+  --forward dense \
+  --out runs/ensemble/predictions.csv \
+  --summary runs/ensemble/summary.csv
+```
+
+Ensemble com DSA exact:
+
+```bash
+go run ./cmd/ensemble \
+  --dataset ./dataset \
+  --checkpoint-glob 'runs/dense_sweep_v3_finalists/*/checkpoints/best.gob' \
+  --split test \
+  --forward sparse-exact \
+  --out runs/ensemble/predictions_sparse_exact.csv \
+  --summary runs/ensemble/summary_sparse_exact.csv
+```
+
 ## Resultados resumidos da DSA exact
 
 Resultados no split de teste, com `lr = 0.003`, `batch = 16`, `epochs = 200`, `seed = 42` e benchmark com `repeat = 500`, `warmup = 50`, `gomaxprocs = 1`.
@@ -221,7 +260,7 @@ O threshold `0.05` foi o ponto conservador mais estável nos experimentos, aumen
 
 ## Documentação detalhada
 
-A documentação principal da extensão está em:
+A documentação principal da extensão DSA está em:
 
 ```text
 docs/dsa_extension.md
