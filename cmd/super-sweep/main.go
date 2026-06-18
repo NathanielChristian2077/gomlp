@@ -12,7 +12,6 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -27,32 +26,33 @@ var learningRates = []float64{0, 0.0001, 0.0003, 0.001, 0.003, 0.01}
 var batchSizes = []int{0, 16, 32, 64}
 
 const (
-	maxEpochs            = 500
-	minEpochs            = 30
-	patience             = 35
-	lowLearningWindow    = 15
-	minValidationDelta   = 1e-4
-	lowLearningDelta     = 1e-4
-	divergentLossLimit   = 10.0
-	superSweepConfigID   = "super-sweep-v1"
-	defaultDatasetPath   = "./dataset"
-	defaultOutputRoot    = "runs/super_sweep"
+	maxEpochs          = 500
+	minEpochs          = 30
+	patience           = 35
+	lowLearningWindow  = 15
+	minValidationDelta = 1e-4
+	lowLearningDelta   = 1e-4
+	divergentLossLimit = 10.0
+	superSweepConfigID = "super-sweep-v1"
+	defaultDatasetPath = "./dataset"
+	defaultOutputRoot  = "runs/super_sweep"
 )
 
 type superConfig struct {
-	Name          string    `json:"name"`
-	DatasetPath   string    `json:"dataset_path"`
-	HiddenSizes   []int     `json:"hidden_sizes"`
-	LearningRate  float64   `json:"learning_rate"`
-	BatchSize     int       `json:"batch_size"`
-	Seed          int64     `json:"seed"`
-	MaxEpochs     int       `json:"max_epochs"`
-	MinEpochs     int       `json:"min_epochs"`
-	Patience      int       `json:"patience"`
-	Window        int       `json:"low_learning_window"`
-	MinValDelta   float64   `json:"min_validation_delta"`
-	LowLearnDelta float64   `json:"low_learning_delta"`
-	CreatedBy     string    `json:"created_by"`
+	Name          string  `json:"name"`
+	DatasetPath   string  `json:"dataset_path"`
+	OutputRoot    string  `json:"output_root"`
+	HiddenSizes   []int   `json:"hidden_sizes"`
+	LearningRate  float64 `json:"learning_rate"`
+	BatchSize     int     `json:"batch_size"`
+	Seed          int64   `json:"seed"`
+	MaxEpochs     int     `json:"max_epochs"`
+	MinEpochs     int     `json:"min_epochs"`
+	Patience      int     `json:"patience"`
+	Window        int     `json:"low_learning_window"`
+	MinValDelta   float64 `json:"min_validation_delta"`
+	LowLearnDelta float64 `json:"low_learning_delta"`
+	CreatedBy     string  `json:"created_by"`
 }
 
 type superResult struct {
@@ -190,6 +190,7 @@ func buildConfigs(datasetPath string, outputRoot string) []superConfig {
 					configs = append(configs, superConfig{
 						Name:          name,
 						DatasetPath:   datasetPath,
+						OutputRoot:    outputRoot,
 						HiddenSizes:   append([]int(nil), hidden...),
 						LearningRate:  lr,
 						BatchSize:     batch,
@@ -260,7 +261,7 @@ func runOrLoadSuper(config superConfig, dataset experiment.DatasetBundle) superR
 	if err != nil {
 		return failedSuperResult(config, "", "", err)
 	}
-	runDir := filepath.Join(configOutputRoot(config), runID+"_"+sanitizeRunName(config.Name))
+	runDir := filepath.Join(config.OutputRoot, runID+"_"+sanitizeRunName(config.Name))
 	summaryPath := filepath.Join(runDir, "summary.json")
 
 	if err := validateSuperConfig(config); err != nil {
@@ -423,6 +424,9 @@ func runOrLoadSuper(config superConfig, dataset experiment.DatasetBundle) superR
 }
 
 func validateSuperConfig(config superConfig) error {
+	if strings.TrimSpace(config.OutputRoot) == "" {
+		return fmt.Errorf("output root cannot be empty")
+	}
 	if len(config.HiddenSizes) == 0 {
 		return fmt.Errorf("at least one hidden layer is required")
 	}
@@ -514,31 +518,19 @@ func parameterCount(inputSize int, hiddenSizes []int) int {
 		count += previous*size + size
 		previous = size
 	}
-	count += previous*1 + 1
+	count += previous + 1
 	return count
 }
 
 func configID(config superConfig) (string, error) {
-	payload, err := json.Marshal(config)
+	fingerprint := config
+	fingerprint.OutputRoot = ""
+	payload, err := json.Marshal(fingerprint)
 	if err != nil {
 		return "", err
 	}
 	sum := sha256.Sum256(payload)
 	return hex.EncodeToString(sum[:])[:12], nil
-}
-
-func configOutputRoot(config superConfig) string {
-	root := strings.TrimSpace(config.DatasetPath)
-	_ = root
-	// Output root is intentionally not part of the stable fingerprint. The actual
-	// root comes from the generated config name path in buildConfigs.
-	return currentOutputRoot
-}
-
-var currentOutputRoot string
-
-func init() {
-	currentOutputRoot = defaultOutputRoot
 }
 
 func sanitizeRunName(name string) string {
@@ -681,8 +673,4 @@ func writeJSONAtomic(path string, value any) error {
 		return err
 	}
 	return os.Rename(tmp, path)
-}
-
-func init() {
-	sort.Ints(hiddenCandidates)
 }
