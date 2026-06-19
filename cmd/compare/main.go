@@ -56,6 +56,7 @@ func main() {
 	batchSize := flag.Int("batch", 0, "mini-batch size; if <= 0, full-batch training is used")
 	seed := flag.Int64("seed", 42, "random seed")
 	learningRate := flag.Float64("lr", -1, "learning rate; if negative, the dataset default is selected")
+	outputHead := flag.String("head", string(nn.OutputHeadSigmoid1), "output head: sigmoid1 or softmax2")
 	runsRoot := flag.String("runs", "runs", "root directory used to find or create the dense training run")
 	runName := flag.String("name", "dense_compare", "human-readable run name for the dense model")
 	checkpointPath := flag.String("checkpoint", "", "optional checkpoint path; if set, training/cache lookup is skipped")
@@ -66,6 +67,9 @@ func main() {
 
 	hiddenSizes, err := experiment.ParseHiddenArchitecture(*hiddenRaw)
 	if err != nil {
+		log.Fatal(err)
+	}
+	if _, err := nn.NormalizeOutputHead(*outputHead); err != nil {
 		log.Fatal(err)
 	}
 
@@ -110,6 +114,7 @@ func main() {
 			BatchSize:    *batchSize,
 			Seed:         *seed,
 			LearningRate: *learningRate,
+			OutputHead:   *outputHead,
 			OutputRoot:   *runsRoot,
 		}
 
@@ -156,11 +161,11 @@ func main() {
 		results = append(results, result)
 	}
 
-	if err := writeCompareCSV(out, runID, *runName, hiddenLabel, bestEpoch, results); err != nil {
+	if err := writeCompareCSV(out, runID, *runName, hiddenLabel, string(model.Head()), bestEpoch, results); err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("run_id=%s run_dir=%s best_epoch=%d split=%s samples=%d out=%s\n", runID, runDir, bestEpoch, normalizedSplit, len(samples), out)
+	fmt.Printf("run_id=%s run_dir=%s best_epoch=%d head=%s split=%s samples=%d out=%s\n", runID, runDir, bestEpoch, model.Head(), normalizedSplit, len(samples), out)
 	fmt.Printf(
 		"%-18s %-10s %-10s %-10s %-10s %-10s %-10s %-12s %-12s %-14s %-12s %-10s %-10s\n",
 		"mode", "threshold", "loss", "acc", "precision", "recall", "f1", "ms", "speedup", "active", "avg_active", "sparsity", "mismatch",
@@ -198,9 +203,9 @@ func evaluateDense(model *nn.MLP, samples []nn.Sample, split string) (compareRes
 
 	for i, sample := range samples {
 		yHat := model.Forward(sample.X)
-		predicted := metrics.Classify(yHat, nn.DefaultClassificationThreshold)
+		predicted := model.PredictClassFromLastForward()
 		predictions[i] = samplePrediction{YHat: yHat, Predicted: predicted}
-		loss += nn.BinaryCrossEntropy(yHat, sample.Y)
+		loss += model.LossFromLastForward(sample.Y)
 		confusion.Add(yHat, sample.Y, nn.DefaultClassificationThreshold)
 	}
 
@@ -259,9 +264,9 @@ func evaluateSparse(model *nn.MLP, samples []nn.Sample, split string, threshold 
 
 	for i, sample := range samples {
 		yHat, stats := model.ForwardSparseWithStatsWorkspace(sample.X, threshold, workspace)
-		predicted := metrics.Classify(yHat, nn.DefaultClassificationThreshold)
+		predicted := model.PredictClassFromLastForward()
 
-		loss += nn.BinaryCrossEntropy(yHat, sample.Y)
+		loss += model.LossFromLastForward(sample.Y)
 		confusion.Add(yHat, sample.Y, nn.DefaultClassificationThreshold)
 
 		denseOpsTotal += stats.DenseOps
@@ -428,7 +433,7 @@ func layerActivationSummary(activeTotals, slotTotals []int, samples int) string 
 	return strings.Join(parts, ";")
 }
 
-func writeCompareCSV(path string, runID string, runName string, hiddenLabel string, bestEpoch int, results []compareResult) error {
+func writeCompareCSV(path string, runID string, runName string, hiddenLabel string, outputHead string, bestEpoch int, results []compareResult) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
@@ -446,6 +451,7 @@ func writeCompareCSV(path string, runID string, runName string, hiddenLabel stri
 		"run_id",
 		"run_name",
 		"hidden",
+		"output_head",
 		"best_epoch",
 		"mode",
 		"threshold",
@@ -482,6 +488,7 @@ func writeCompareCSV(path string, runID string, runName string, hiddenLabel stri
 			runID,
 			runName,
 			hiddenLabel,
+			outputHead,
 			fmt.Sprintf("%d", bestEpoch),
 			result.Mode,
 			formatFloat(result.Threshold),
