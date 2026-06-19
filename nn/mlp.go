@@ -6,11 +6,13 @@ import (
 )
 
 // MLP representa uma rede totalmente conectada manual:
-// entrada -> uma ou mais camadas ocultas ReLU -> saída sigmoid.
+// entrada -> uma ou mais camadas ocultas ReLU -> cabeça de saída configurável.
 // Hidden é um slice para permitir comparar arquiteturas com diferentes profundidades.
 type MLP struct {
 	Hidden []DenseLayer
 	Output DenseLayer
+
+	OutputHead OutputHead
 
 	HiddenZ [][]float64
 	HiddenA [][]float64
@@ -91,9 +93,14 @@ func NewMLP(inputSize, hiddenSize int, seed int64) *MLP {
 	return NewMLPWithHiddenSizes(inputSize, []int{hiddenSize}, seed)
 }
 
-// NewMLPWithHiddenSizes cria uma MLP com uma ou mais camadas ocultas.
-// O seed fixa a inicialização dos pesos para tornar os experimentos reproduzíveis.
+// NewMLPWithHiddenSizes cria uma MLP com saída sigmoid binária por padrão.
 func NewMLPWithHiddenSizes(inputSize int, hiddenSizes []int, seed int64) *MLP {
+	return NewMLPWithHiddenSizesAndHead(inputSize, hiddenSizes, seed, string(OutputHeadSigmoid1))
+}
+
+// NewMLPWithHiddenSizesAndHead cria uma MLP com uma ou mais camadas ocultas e cabeça configurável.
+// O seed fixa a inicialização dos pesos para tornar os experimentos reproduzíveis.
+func NewMLPWithHiddenSizesAndHead(inputSize int, hiddenSizes []int, seed int64, outputHead string) *MLP {
 	if inputSize <= 0 {
 		panic(fmt.Sprintf("invalid input size: %d", inputSize))
 	}
@@ -101,6 +108,7 @@ func NewMLPWithHiddenSizes(inputSize int, hiddenSizes []int, seed int64) *MLP {
 		panic("MLP requires at least one hidden layer")
 	}
 
+	head := mustNormalizeOutputHead(outputHead)
 	rng := rand.New(rand.NewSource(seed))
 	hidden := make([]DenseLayer, len(hiddenSizes))
 	hiddenZ := make([][]float64, len(hiddenSizes))
@@ -120,17 +128,26 @@ func NewMLPWithHiddenSizes(inputSize int, hiddenSizes []int, seed int64) *MLP {
 		previousSize = size
 	}
 
+	outputSize := head.OutputSize()
 	return &MLP{
-		Hidden: hidden,
-		Output: NewDenseLayer(previousSize, 1, rng),
+		Hidden:     hidden,
+		Output:     NewDenseLayer(previousSize, outputSize, rng),
+		OutputHead: head,
 
 		HiddenZ: hiddenZ,
 		HiddenA: hiddenA,
-		OutputZ: make([]float64, 1),
+		OutputZ: make([]float64, outputSize),
 
 		DeltaHidden: deltaHidden,
-		DeltaOutput: make([]float64, 1),
+		DeltaOutput: make([]float64, outputSize),
 	}
+}
+
+func (m *MLP) Head() OutputHead {
+	if m == nil {
+		return OutputHeadSigmoid1
+	}
+	return normalizeModelOutputHead(m.OutputHead)
 }
 
 func (m *MLP) InputSize() int {
@@ -159,8 +176,9 @@ func (m *MLP) Clone() *MLP {
 	}
 
 	return &MLP{
-		Hidden: cloneDenseLayerSlice(m.Hidden),
-		Output: m.Output.Clone(),
+		Hidden:     cloneDenseLayerSlice(m.Hidden),
+		Output:     m.Output.Clone(),
+		OutputHead: m.Head(),
 
 		HiddenZ: cloneFloat64Matrix(m.HiddenZ),
 		HiddenA: cloneFloat64Matrix(m.HiddenA),
@@ -171,7 +189,7 @@ func (m *MLP) Clone() *MLP {
 	}
 }
 
-// Forward calcula a saída da rede para uma amostra.
+// Forward calcula a probabilidade da classe positiva, dog, para uma amostra.
 func (m *MLP) Forward(x []float64) float64 {
 	if len(x) != m.InputSize() {
 		panic(fmt.Sprintf("invalid forward input length: expected %d, got %d", m.InputSize(), len(x)))
@@ -198,7 +216,15 @@ func (m *MLP) forwardUnchecked(x []float64) float64 {
 	}
 
 	m.Output.forwardUnchecked(input, m.OutputZ)
-	return Sigmoid(m.OutputZ[0])
+	return m.Head().PositiveProbability(m.OutputZ)
+}
+
+func (m *MLP) LossFromLastForward(y float64) float64 {
+	return m.Head().LossFromLogits(m.OutputZ, y)
+}
+
+func (m *MLP) PredictClassFromLastForward() int {
+	return m.Head().PredictClass(m.OutputZ)
 }
 
 // ForwardSparseExact calcula a saída usando propagação esparsa dinâmica exata.
@@ -229,7 +255,7 @@ func (m *MLP) ForwardSparsePrepared(x []float64, threshold float64, workspace *S
 	}
 
 	m.Output.forwardSparseUnchecked(workspace.Active[len(m.Hidden)-1], m.OutputZ)
-	return Sigmoid(m.OutputZ[0])
+	return m.Head().PositiveProbability(m.OutputZ)
 }
 
 // ForwardSparseWithStats calcula a saída usando propagação esparsa dinâmica.
@@ -259,6 +285,7 @@ func (m *MLP) ForwardSparseWithStatsWorkspace(x []float64, threshold float64, wo
 	for layerIndex := 1; layerIndex < len(m.Hidden); layerIndex++ {
 		layer := &m.Hidden[layerIndex]
 		layer.forwardSparseUnchecked(workspace.Active[layerIndex-1], m.HiddenZ[layerIndex])
+
 		stats.DenseOps += estimateDenseOps(*layer)
 		stats.SparseOps += estimateSparseOps(workspace.Active[layerIndex-1], layer.Out)
 
@@ -272,13 +299,14 @@ func (m *MLP) ForwardSparseWithStatsWorkspace(x []float64, threshold float64, wo
 	stats.SparseOps += estimateSparseOps(lastActive, m.Output.Out)
 	stats.Hidden = workspace.HiddenStats
 
-	return Sigmoid(m.OutputZ[0]), stats
+	return m.Head().PositiveProbability(m.OutputZ), stats
 }
 
 // Backward acumula os gradientes de uma amostra.
-// Com sigmoid + Binary Cross Entropy, o delta da saída é yHat - y.
+// Para sigmoid+BCE e softmax+cross-entropy, o delta da saída é probabilidade - alvo.
 func (m *MLP) Backward(x []float64, yHat, y float64) {
-	m.DeltaOutput[0] = yHat - y
+	_ = yHat // mantido na assinatura para preservar a API anterior.
+	m.Head().FillOutputDelta(m.OutputZ, y, m.DeltaOutput)
 
 	lastHidden := len(m.Hidden) - 1
 	m.Output.AccumulateGrad(m.HiddenA[lastHidden], m.DeltaOutput)
