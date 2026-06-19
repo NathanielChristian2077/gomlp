@@ -8,7 +8,7 @@ import (
 	"github.com/NathanielChristian2077/gomlp/metrics"
 )
 
-// DefaultClassificationThreshold converte a saída sigmoid em classe binária.
+// DefaultClassificationThreshold converte a probabilidade positiva em classe binária.
 const DefaultClassificationThreshold = 0.5
 
 // Sample representa uma amostra supervisionada da MLP.
@@ -88,7 +88,7 @@ func Evaluate(model *MLP, samples []Sample) (EpochResult, error) {
 
 	for _, sample := range samples {
 		yHat := model.Forward(sample.X)
-		loss += BinaryCrossEntropy(yHat, sample.Y)
+		loss += model.LossFromLastForward(sample.Y)
 		confusion.Add(yHat, sample.Y, DefaultClassificationThreshold)
 	}
 
@@ -106,6 +106,9 @@ func validateTrainingInput(model *MLP, samples []Sample) error {
 	}
 	if len(model.Hidden) == 0 {
 		return fmt.Errorf("model has no hidden layers")
+	}
+	if model.Output.Out != model.Head().OutputSize() {
+		return fmt.Errorf("model output shape %d does not match output head %s", model.Output.Out, model.Head())
 	}
 	if len(samples) == 0 {
 		return fmt.Errorf("empty sample set")
