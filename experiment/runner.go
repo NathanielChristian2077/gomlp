@@ -21,6 +21,7 @@ type RunResult struct {
 	BestEpoch              int                     `json:"best_epoch"`
 	BestValidationLoss     float64                 `json:"best_validation_loss"`
 	BestValidationAccuracy float64                 `json:"best_validation_accuracy"`
+	OutputHead             string                  `json:"output_head"`
 	TestLoss               float64                 `json:"test_loss"`
 	TestAccuracy           float64                 `json:"test_accuracy"`
 	TestPrecision          float64                 `json:"test_precision"`
@@ -103,7 +104,7 @@ func RunOrLoadExperiment(config RunConfig, dataset DatasetBundle) RunResult {
 		batchSize = len(dataset.Train)
 	}
 
-	model := nn.NewMLPWithHiddenSizes(dataset.InputSize, config.HiddenSizes, config.Seed)
+	model := nn.NewMLPWithHiddenSizesAndHead(dataset.InputSize, config.HiddenSizes, config.Seed, config.OutputHead)
 	rng := rand.New(rand.NewSource(config.Seed + 1))
 
 	logger, err := metrics.NewEpochCSVLogger(filepath.Join(runDir, "metrics.csv"))
@@ -183,6 +184,7 @@ func RunOrLoadExperiment(config RunConfig, dataset DatasetBundle) RunResult {
 		BestEpoch:              bestEpoch,
 		BestValidationLoss:     bestValidationResult.Loss,
 		BestValidationAccuracy: bestValidationResult.Accuracy,
+		OutputHead:             string(bestModel.Head()),
 		TestLoss:               testResult.Loss,
 		TestAccuracy:           testResult.Accuracy,
 		TestPrecision:          testResult.Confusion.Precision(),
@@ -212,6 +214,7 @@ func failedResult(config RunConfig, runID string, runDir string, err error) RunR
 		Name:         config.Name,
 		RunDirectory: runDir,
 		Completed:    false,
+		OutputHead:   config.OutputHead,
 	}
 	if err != nil {
 		result.Error = err.Error()
@@ -267,19 +270,19 @@ func writePredictionsCSV(path string, model *nn.MLP, samples []nn.Sample) error 
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	if err := writer.Write([]string{"index", "y", "y_hat", "predicted"}); err != nil {
+	if err := writer.Write([]string{"index", "label", "positive_probability", "predicted"}); err != nil {
 		return err
 	}
 
 	for i, sample := range samples {
 		yHat := model.Forward(sample.X)
-		row := []string{
+		predicted := model.PredictClassFromLastForward()
+		if err := writer.Write([]string{
 			fmt.Sprintf("%d", i),
 			fmt.Sprintf("%.0f", sample.Y),
 			fmt.Sprintf("%.8f", yHat),
-			fmt.Sprintf("%d", metrics.Classify(yHat, nn.DefaultClassificationThreshold)),
-		}
-		if err := writer.Write(row); err != nil {
+			fmt.Sprintf("%d", predicted),
+		}); err != nil {
 			return err
 		}
 	}
