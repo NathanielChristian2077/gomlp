@@ -22,6 +22,7 @@ type Checkpoint struct {
 	BestEpoch              int               `json:"best_epoch"`
 	BestValidationLoss     float64           `json:"best_validation_loss"`
 	BestValidationAccuracy float64           `json:"best_validation_accuracy"`
+	OutputHead             string            `json:"output_head"`
 	Hidden                 []LayerCheckpoint `json:"hidden"`
 	Output                 LayerCheckpoint   `json:"output"`
 }
@@ -33,6 +34,7 @@ func NewCheckpoint(runID string, epoch int, bestEpoch int, bestValidation nn.Epo
 		BestEpoch:              bestEpoch,
 		BestValidationLoss:     bestValidation.Loss,
 		BestValidationAccuracy: bestValidation.Accuracy,
+		OutputHead:             string(model.Head()),
 		Hidden:                 snapshotLayers(model.Hidden),
 		Output:                 snapshotLayer(model.Output),
 	}
@@ -98,8 +100,13 @@ func RestoreModel(checkpoint Checkpoint) (*nn.MLP, error) {
 	if checkpoint.Output.In != lastHidden.Out {
 		return nil, fmt.Errorf("invalid model checkpoint: output input size %d does not match last hidden output size %d", checkpoint.Output.In, lastHidden.Out)
 	}
-	if checkpoint.Output.Out != 1 {
-		return nil, fmt.Errorf("invalid model checkpoint: output layer must have one neuron, got %d", checkpoint.Output.Out)
+
+	head, err := checkpointOutputHead(checkpoint)
+	if err != nil {
+		return nil, err
+	}
+	if checkpoint.Output.Out != head.OutputSize() {
+		return nil, fmt.Errorf("invalid model checkpoint: output layer has %d neurons but output head %s expects %d", checkpoint.Output.Out, head, head.OutputSize())
 	}
 
 	hidden := restoreLayers(checkpoint.Hidden)
@@ -115,8 +122,9 @@ func RestoreModel(checkpoint Checkpoint) (*nn.MLP, error) {
 	}
 
 	return &nn.MLP{
-		Hidden: hidden,
-		Output: output,
+		Hidden:     hidden,
+		Output:     output,
+		OutputHead: head,
 
 		HiddenZ: hiddenZ,
 		HiddenA: hiddenA,
@@ -125,6 +133,21 @@ func RestoreModel(checkpoint Checkpoint) (*nn.MLP, error) {
 		DeltaHidden: deltaHidden,
 		DeltaOutput: make([]float64, output.Out),
 	}, nil
+}
+
+func checkpointOutputHead(checkpoint Checkpoint) (nn.OutputHead, error) {
+	if checkpoint.OutputHead != "" {
+		return nn.NormalizeOutputHead(checkpoint.OutputHead)
+	}
+	// Compatibilidade com checkpoints antigos que não tinham o campo OutputHead.
+	switch checkpoint.Output.Out {
+	case 1:
+		return nn.OutputHeadSigmoid1, nil
+	case 2:
+		return nn.OutputHeadSoftmax2, nil
+	default:
+		return "", fmt.Errorf("cannot infer output head for output size %d", checkpoint.Output.Out)
+	}
 }
 
 func snapshotLayers(layers []nn.DenseLayer) []LayerCheckpoint {
