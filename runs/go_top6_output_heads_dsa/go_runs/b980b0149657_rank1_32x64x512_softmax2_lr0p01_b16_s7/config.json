@@ -1,0 +1,16 @@
+{
+  "name": "rank1_32x64x512_softmax2_lr0p01_b16_s7",
+  "dataset_path": "./dataset",
+  "epochs": 500,
+  "hidden_sizes": [
+    32,
+    64,
+    512
+  ],
+  "batch_size": 16,
+  "seed": 7,
+  "learning_rate": 0.01,
+  "output_head": "softmax2",
+  "output_root": "runs/go_top6_output_heads_dsa/go_runs",
+  "log_every": 0
+}

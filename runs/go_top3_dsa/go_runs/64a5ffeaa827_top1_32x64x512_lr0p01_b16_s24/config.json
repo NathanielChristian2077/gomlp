@@ -1,0 +1,16 @@
+{
+  "name": "top1_32x64x512_lr0p01_b16_s24",
+  "dataset_path": "./dataset",
+  "epochs": 500,
+  "hidden_sizes": [
+    32,
+    64,
+    512
+  ],
+  "batch_size": 16,
+  "seed": 24,
+  "learning_rate": 0.01,
+  "output_head": "sigmoid1",
+  "output_root": "runs/go_top3_dsa/go_runs",
+  "log_every": 0
+}

@@ -1,0 +1,2 @@
+rank,hidden,learning_rate,batch_size,head_mode,parameter_count,completed,failed,score,acc_mean,acc_std,acc_min,acc_max,f1_mean,f1_std,loss_mean,gap_abs_mean,epochs_mean,best_seed,best_seed_acc,best_seed_f1,best_seed_loss,best_seed_gap
+1,32x64x512,0.01,16,softmax2,167522,42,0,0.8953632427890565,0.589047619047619,0.023177320997405625,0.54,0.64,0.5747926954644074,0.09295777284795365,0.7418108781178793,0.09396825396825399,42.69047619047619,7,0.64,0.6000000000000001,0.6872027516365051,0.030000000000000027

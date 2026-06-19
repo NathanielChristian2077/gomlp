@@ -1,0 +1,308 @@
+log=runs/go_top6_output_heads_dsa/logs/run_20260619_165717.log
+started_at=2026-06-19T16:57:17-03:00
+
+--- preflight: go test ./... ---
+?   	github.com/NathanielChristian2077/gomlp/cmd/bench	[no test files]
+?   	github.com/NathanielChristian2077/gomlp/cmd/compare	[no test files]
+?   	github.com/NathanielChristian2077/gomlp/cmd/ensemble	[no test files]
+?   	github.com/NathanielChristian2077/gomlp/cmd/super-sweep	[no test files]
+?   	github.com/NathanielChristian2077/gomlp/cmd/sweep	[no test files]
+?   	github.com/NathanielChristian2077/gomlp/cmd/train	[no test files]
+?   	github.com/NathanielChristian2077/gomlp/data	[no test files]
+ok  	github.com/NathanielChristian2077/gomlp/experiment	(cached)
+?   	github.com/NathanielChristian2077/gomlp/internal/tensor	[no test files]
+?   	github.com/NathanielChristian2077/gomlp/metrics	[no test files]
+ok  	github.com/NathanielChristian2077/gomlp/nn	(cached)
+dataset=./dataset
+runs_root=runs/go_top6_output_heads_dsa
+epochs=500 thresholds=0,0.025,0.05,0.075,0.1
+skip_bench=0 only_rank=all
+manifest=runs/go_top6_output_heads_dsa/top6_manifest.csv
+
+=== rank=1 label=rank1_32x64x512_softmax2_lr0p01_b16_s7 hidden=32x64x512 head=softmax2 lr=0.01 batch=16 seed=7 ===
+--- compare split=validation ---
+run_id=b980b0149657 run_dir=runs/go_top6_output_heads_dsa/go_runs/b980b0149657_rank1_32x64x512_softmax2_lr0p01_b16_s7 best_epoch=11 head=softmax2 split=validation samples=100 out=runs/go_top6_output_heads_dsa/rank1_32x64x512_softmax2_lr0p01_b16_s7/compare_validation.csv
+mode               threshold  loss       acc        precision  recall     f1         ms           speedup      active         avg_active   sparsity   mismatch  
+dense              0          0.689436   0.5900     0.8000     0.2400     0.3692     14           1.0000       60800/60800    202.6667     0.0000     0         
+  activations_by_layer: L0=32.00/32;L1=64.00/64;L2=512.00/512
+sparse_exact       0          0.689436   0.5900     0.8000     0.2400     0.3692     12           1.1152       28879/60800    96.2633      0.5250     0         
+  activations_by_layer: L0=3.01/32;L1=34.97/64;L2=250.81/512
+sparse_threshold   0.025      0.689811   0.5700     0.7333     0.2200     0.3385     12           1.1342       24541/60800    81.8033      0.5964     2         
+  activations_by_layer: L0=2.78/32;L1=30.26/64;L2=212.37/512
+sparse_threshold   0.05       0.689342   0.5600     0.7143     0.2000     0.3125     11           1.1549       20458/60800    68.1933      0.6635     3         
+  activations_by_layer: L0=2.65/32;L1=25.25/64;L2=176.68/512
+sparse_threshold   0.075      0.688684   0.5700     0.7333     0.2200     0.3385     12           1.1715       16823/60800    56.0767      0.7233     8         
+  activations_by_layer: L0=2.51/32;L1=21.39/64;L2=144.33/512
+sparse_threshold   0.1        0.688790   0.5400     0.6667     0.1600     0.2581     12           1.1879       13255/60800    44.1833      0.7820     5         
+  activations_by_layer: L0=2.36/32;L1=17.70/64;L2=112.49/512
+--- compare split=test ---
+run_id=b980b0149657 run_dir=runs/go_top6_output_heads_dsa/go_runs/b980b0149657_rank1_32x64x512_softmax2_lr0p01_b16_s7 best_epoch=11 head=softmax2 split=test samples=100 out=runs/go_top6_output_heads_dsa/rank1_32x64x512_softmax2_lr0p01_b16_s7/compare_test.csv
+mode               threshold  loss       acc        precision  recall     f1         ms           speedup      active         avg_active   sparsity   mismatch  
+dense              0          0.689732   0.5100     0.6000     0.0600     0.1091     16           1.0000       60800/60800    202.6667     0.0000     0         
+  activations_by_layer: L0=32.00/32;L1=64.00/64;L2=512.00/512
+sparse_exact       0          0.689732   0.5100     0.6000     0.0600     0.1091     12           1.1132       28974/60800    96.5800      0.5235     0         
+  activations_by_layer: L0=2.78/32;L1=35.52/64;L2=251.44/512
+sparse_threshold   0.025      0.689300   0.5100     0.5714     0.0800     0.1404     12           1.1344       24269/60800    80.8967      0.6008     2         
+  activations_by_layer: L0=2.54/32;L1=30.23/64;L2=209.92/512
+sparse_threshold   0.05       0.689774   0.5100     0.5714     0.0800     0.1404     12           1.1554       19724/60800    65.7467      0.6756     6         
+  activations_by_layer: L0=2.40/32;L1=25.18/64;L2=169.66/512
+sparse_threshold   0.075      0.689029   0.4900     0.4000     0.0400     0.0727     12           1.1753       15752/60800    52.5067      0.7409     4         
+  activations_by_layer: L0=2.20/32;L1=20.58/64;L2=134.74/512
+sparse_threshold   0.1        0.691581   0.5000     0.5000     0.0600     0.1071     11           1.1921       12382/60800    41.2733      0.7963     7         
+  activations_by_layer: L0=2.03/32;L1=16.81/64;L2=104.98/512
+--- bench split=test ---
+run_id=b980b0149657 run_dir=runs/go_top6_output_heads_dsa/go_runs/b980b0149657_rank1_32x64x512_softmax2_lr0p01_b16_s7 best_epoch=11 head=softmax2 split=test samples=100 repeat=300 warmup=20 gomaxprocs=16 out=runs/go_top6_output_heads_dsa/rank1_32x64x512_softmax2_lr0p01_b16_s7/bench_test.csv
+mode               threshold  total_ms     ns_forward     forward/s    speedup      ops_saved    active         sparsity   checksum  
+dense              0          4429         147657.18      6772.44      1.0000       0.0000       60800/60800    0.0000     14025.3125
+  activations_by_layer: L0=32.00/32;L1=64.00/64;L2=512.00/512
+sparse_exact       0          3248         108273.07      9235.91      1.1132       0.1017       28974/60800    0.5235     14025.3125
+  activations_by_layer: L0=2.78/32;L1=35.52/64;L2=251.44/512
+sparse_threshold   0.025      3147         104902.21      9532.69      1.1344       0.1185       24269/60800    0.6008     14016.9940
+  activations_by_layer: L0=2.54/32;L1=30.23/64;L2=209.92/512
+sparse_threshold   0.05       3110         103685.03      9644.59      1.1554       0.1345       19724/60800    0.6756     13975.0323
+  activations_by_layer: L0=2.40/32;L1=25.18/64;L2=169.66/512
+sparse_threshold   0.075      2979         99314.99       10068.97     1.1753       0.1491       15752/60800    0.7409     13964.4382
+  activations_by_layer: L0=2.20/32;L1=20.58/64;L2=134.74/512
+sparse_threshold   0.1        2942         98082.54       10195.49     1.1921       0.1611       12382/60800    0.7963     14063.6135
+  activations_by_layer: L0=2.03/32;L1=16.81/64;L2=104.98/512
+
+=== rank=2 label=rank2_32x64x512_sigmoid1_lr0p01_b16_s24 hidden=32x64x512 head=sigmoid1 lr=0.01 batch=16 seed=24 ===
+--- compare split=validation ---
+run_id=64a5ffeaa827 run_dir=runs/go_top6_output_heads_dsa/go_runs/64a5ffeaa827_rank2_32x64x512_sigmoid1_lr0p01_b16_s24 best_epoch=57 head=sigmoid1 split=validation samples=100 out=runs/go_top6_output_heads_dsa/rank2_32x64x512_sigmoid1_lr0p01_b16_s24/compare_validation.csv
+mode               threshold  loss       acc        precision  recall     f1         ms           speedup      active         avg_active   sparsity   mismatch  
+dense              0          0.786466   0.5900     0.6154     0.4800     0.5393     16           1.0000       60800/60800    202.6667     0.0000     0         
+  activations_by_layer: L0=32.00/32;L1=64.00/64;L2=512.00/512
+sparse_exact       0          0.786466   0.5900     0.6154     0.4800     0.5393     13           1.1115       29265/60800    97.5500      0.5187     0         
+  activations_by_layer: L0=7.21/32;L1=35.02/64;L2=250.42/512
+sparse_threshold   0.025      0.786382   0.5900     0.6154     0.4800     0.5393     12           1.1162       28322/60800    94.4067      0.5342     0         
+  activations_by_layer: L0=6.99/32;L1=33.82/64;L2=242.41/512
+sparse_threshold   0.05       0.785875   0.5900     0.6154     0.4800     0.5393     12           1.1205       27429/60800    91.4300      0.5489     0         
+  activations_by_layer: L0=6.81/32;L1=32.75/64;L2=234.73/512
+sparse_threshold   0.075      0.786049   0.6000     0.6316     0.4800     0.5455     25           1.1236       26526/60800    88.4200      0.5637     1         
+  activations_by_layer: L0=6.61/32;L1=31.97/64;L2=226.68/512
+sparse_threshold   0.1        0.786630   0.5900     0.6154     0.4800     0.5393     12           1.1270       25651/60800    85.5033      0.5781     0         
+  activations_by_layer: L0=6.44/32;L1=31.15/64;L2=218.92/512
+--- compare split=test ---
+run_id=64a5ffeaa827 run_dir=runs/go_top6_output_heads_dsa/go_runs/64a5ffeaa827_rank2_32x64x512_sigmoid1_lr0p01_b16_s24 best_epoch=57 head=sigmoid1 split=test samples=100 out=runs/go_top6_output_heads_dsa/rank2_32x64x512_sigmoid1_lr0p01_b16_s24/compare_test.csv
+mode               threshold  loss       acc        precision  recall     f1         ms           speedup      active         avg_active   sparsity   mismatch  
+dense              0          0.782508   0.5000     0.5000     0.3800     0.4318     16           1.0000       60800/60800    202.6667     0.0000     0         
+  activations_by_layer: L0=32.00/32;L1=64.00/64;L2=512.00/512
+sparse_exact       0          0.782508   0.5000     0.5000     0.3800     0.4318     14           1.1096       29385/60800    97.9500      0.5167     0         
+  activations_by_layer: L0=7.09/32;L1=35.53/64;L2=251.23/512
+sparse_threshold   0.025      0.781829   0.5000     0.5000     0.3800     0.4318     13           1.1140       28431/60800    94.7700      0.5324     0         
+  activations_by_layer: L0=6.89/32;L1=34.40/64;L2=243.02/512
+sparse_threshold   0.05       0.780670   0.5000     0.5000     0.3800     0.4318     13           1.1176       27569/60800    91.8967      0.5466     0         
+  activations_by_layer: L0=6.77/32;L1=33.49/64;L2=235.43/512
+sparse_threshold   0.075      0.781364   0.5000     0.5000     0.3800     0.4318     14           1.1215       26686/60800    88.9533      0.5611     2         
+  activations_by_layer: L0=6.57/32;L1=32.52/64;L2=227.77/512
+sparse_threshold   0.1        0.784631   0.4900     0.4872     0.3800     0.4270     13           1.1249       25818/60800    86.0600      0.5754     1         
+  activations_by_layer: L0=6.42/32;L1=31.68/64;L2=220.08/512
+--- bench split=test ---
+run_id=64a5ffeaa827 run_dir=runs/go_top6_output_heads_dsa/go_runs/64a5ffeaa827_rank2_32x64x512_sigmoid1_lr0p01_b16_s24 best_epoch=57 head=sigmoid1 split=test samples=100 repeat=300 warmup=20 gomaxprocs=16 out=runs/go_top6_output_heads_dsa/rank2_32x64x512_sigmoid1_lr0p01_b16_s24/bench_test.csv
+mode               threshold  total_ms     ns_forward     forward/s    speedup      ops_saved    active         sparsity   checksum  
+dense              0          4699         156653.10      6383.53      1.0000       0.0000       60800/60800    0.0000     12866.4606
+  activations_by_layer: L0=32.00/32;L1=64.00/64;L2=512.00/512
+sparse_exact       0          3351         111706.34      8952.04      1.1096       0.0987       29385/60800    0.5167     12866.4606
+  activations_by_layer: L0=7.09/32;L1=35.53/64;L2=251.23/512
+sparse_threshold   0.025      3329         110979.23      9010.69      1.1140       0.1024       28431/60800    0.5324     12877.8079
+  activations_by_layer: L0=6.89/32;L1=34.40/64;L2=243.02/512
+sparse_threshold   0.05       3295         109846.23      9103.64      1.1176       0.1052       27569/60800    0.5466     12866.3807
+  activations_by_layer: L0=6.77/32;L1=33.49/64;L2=235.43/512
+sparse_threshold   0.075      3289         109647.09      9120.17      1.1215       0.1084       26686/60800    0.5611     12902.9348
+  activations_by_layer: L0=6.57/32;L1=32.52/64;L2=227.77/512
+sparse_threshold   0.1        3248         108298.78      9233.71      1.1249       0.1110       25818/60800    0.5754     12931.9201
+  activations_by_layer: L0=6.42/32;L1=31.68/64;L2=220.08/512
+
+=== rank=3 label=rank3_64x32x512_sigmoid1_lr0p003_b16_s25 hidden=64x32x512 head=sigmoid1 lr=0.003 batch=16 seed=25 ===
+--- compare split=validation ---
+run_id=bfc4ca1b4d3f run_dir=runs/go_top6_output_heads_dsa/go_runs/bfc4ca1b4d3f_rank3_64x32x512_sigmoid1_lr0p003_b16_s25 best_epoch=28 head=sigmoid1 split=validation samples=100 out=runs/go_top6_output_heads_dsa/rank3_64x32x512_sigmoid1_lr0p003_b16_s25/compare_validation.csv
+mode               threshold  loss       acc        precision  recall     f1         ms           speedup      active         avg_active   sparsity   mismatch  
+dense              0          0.743270   0.5400     0.5714     0.3200     0.4103     25           1.0000       60800/60800    202.6667     0.0000     0         
+  activations_by_layer: L0=64.00/64;L1=32.00/32;L2=512.00/512
+sparse_exact       0          0.743270   0.5400     0.5714     0.3200     0.4103     23           1.0400       29137/60800    97.1233      0.5208     0         
+  activations_by_layer: L0=31.62/64;L1=13.43/32;L2=246.32/512
+sparse_threshold   0.025      0.743095   0.5400     0.5714     0.3200     0.4103     23           1.0406       28389/60800    94.6300      0.5331     0         
+  activations_by_layer: L0=30.99/64;L1=13.15/32;L2=239.75/512
+sparse_threshold   0.05       0.742836   0.5300     0.5517     0.3200     0.4051     23           1.0414       27641/60800    92.1367      0.5454     3         
+  activations_by_layer: L0=30.19/64;L1=12.82/32;L2=233.40/512
+sparse_threshold   0.075      0.743626   0.5300     0.5517     0.3200     0.4051     23           1.0420       26919/60800    89.7300      0.5573     3         
+  activations_by_layer: L0=29.45/64;L1=12.60/32;L2=227.14/512
+sparse_threshold   0.1        0.742893   0.5300     0.5517     0.3200     0.4051     23           1.0427       26163/60800    87.2100      0.5697     1         
+  activations_by_layer: L0=28.79/64;L1=12.31/32;L2=220.53/512
+--- compare split=test ---
+run_id=bfc4ca1b4d3f run_dir=runs/go_top6_output_heads_dsa/go_runs/bfc4ca1b4d3f_rank3_64x32x512_sigmoid1_lr0p003_b16_s25 best_epoch=28 head=sigmoid1 split=test samples=100 out=runs/go_top6_output_heads_dsa/rank3_64x32x512_sigmoid1_lr0p003_b16_s25/compare_test.csv
+mode               threshold  loss       acc        precision  recall     f1         ms           speedup      active         avg_active   sparsity   mismatch  
+dense              0          0.734163   0.5000     0.5000     0.1800     0.2647     25           1.0000       60800/60800    202.6667     0.0000     0         
+  activations_by_layer: L0=64.00/64;L1=32.00/32;L2=512.00/512
+sparse_exact       0          0.734163   0.5000     0.5000     0.1800     0.2647     23           1.0399       29307/60800    97.6900      0.5180     0         
+  activations_by_layer: L0=31.67/64;L1=13.49/32;L2=247.91/512
+sparse_threshold   0.025      0.734242   0.5000     0.5000     0.1800     0.2647     26           1.0406       28519/60800    95.0633      0.5309     0         
+  activations_by_layer: L0=30.95/64;L1=13.17/32;L2=241.07/512
+sparse_threshold   0.05       0.734058   0.5100     0.5263     0.2000     0.2899     25           1.0413       27732/60800    92.4400      0.5439     1         
+  activations_by_layer: L0=30.19/64;L1=12.90/32;L2=234.23/512
+sparse_threshold   0.075      0.732356   0.5000     0.5000     0.1800     0.2647     24           1.0420       26962/60800    89.8733      0.5565     2         
+  activations_by_layer: L0=29.50/64;L1=12.57/32;L2=227.55/512
+sparse_threshold   0.1        0.730555   0.5100     0.5294     0.1800     0.2687     24           1.0430       26208/60800    87.3600      0.5689     3         
+  activations_by_layer: L0=28.76/64;L1=12.15/32;L2=221.17/512
+--- bench split=test ---
+run_id=bfc4ca1b4d3f run_dir=runs/go_top6_output_heads_dsa/go_runs/bfc4ca1b4d3f_rank3_64x32x512_sigmoid1_lr0p003_b16_s25 best_epoch=28 head=sigmoid1 split=test samples=100 repeat=300 warmup=20 gomaxprocs=16 out=runs/go_top6_output_heads_dsa/rank3_64x32x512_sigmoid1_lr0p003_b16_s25/bench_test.csv
+mode               threshold  total_ms     ns_forward     forward/s    speedup      ops_saved    active         sparsity   checksum  
+dense              0          7994         266491.69      3752.46      1.0000       0.0000       60800/60800    0.0000     11746.0107
+  activations_by_layer: L0=64.00/64;L1=32.00/32;L2=512.00/512
+sparse_exact       0          6275         209170.35      4780.79      1.0399       0.0383       29307/60800    0.5180     11746.0107
+  activations_by_layer: L0=31.67/64;L1=13.49/32;L2=247.91/512
+sparse_threshold   0.025      6347         211577.51      4726.40      1.0406       0.0390       28519/60800    0.5309     11745.3810
+  activations_by_layer: L0=30.95/64;L1=13.17/32;L2=241.07/512
+sparse_threshold   0.05       6225         207509.22      4819.06      1.0413       0.0396       27732/60800    0.5439     11733.2620
+  activations_by_layer: L0=30.19/64;L1=12.90/32;L2=234.23/512
+sparse_threshold   0.075      6212         207067.13      4829.35      1.0420       0.0403       26962/60800    0.5565     11714.1078
+  activations_by_layer: L0=29.50/64;L1=12.57/32;L2=227.55/512
+sparse_threshold   0.1        6264         208800.86      4789.25      1.0430       0.0412       26208/60800    0.5689     11699.5008
+  activations_by_layer: L0=28.76/64;L1=12.15/32;L2=221.17/512
+
+=== rank=4 label=rank4_128x32x512_sigmoid1_lr0p003_b32_s9 hidden=128x32x512 head=sigmoid1 lr=0.003 batch=32 seed=9 ===
+--- compare split=validation ---
+run_id=f9521d9d19c4 run_dir=runs/go_top6_output_heads_dsa/go_runs/f9521d9d19c4_rank4_128x32x512_sigmoid1_lr0p003_b32_s9 best_epoch=31 head=sigmoid1 split=validation samples=100 out=runs/go_top6_output_heads_dsa/rank4_128x32x512_sigmoid1_lr0p003_b32_s9/compare_validation.csv
+mode               threshold  loss       acc        precision  recall     f1         ms           speedup      active         avg_active   sparsity   mismatch  
+dense              0          0.669182   0.6400     0.6296     0.6800     0.6538     48           1.0000       67200/67200    224.0000     0.0000     0         
+  activations_by_layer: L0=128.00/128;L1=32.00/32;L2=512.00/512
+sparse_exact       0          0.669182   0.6400     0.6296     0.6800     0.6538     44           1.0196       33151/67200    110.5033     0.5067     0         
+  activations_by_layer: L0=69.55/128;L1=15.70/32;L2=246.26/512
+sparse_threshold   0.025      0.669167   0.6300     0.6182     0.6800     0.6476     44           1.0200       32208/67200    107.3600     0.5207     1         
+  activations_by_layer: L0=67.72/128;L1=15.40/32;L2=238.96/512
+sparse_threshold   0.05       0.669199   0.6400     0.6296     0.6800     0.6538     44           1.0206       31265/67200    104.2167     0.5347     0         
+  activations_by_layer: L0=65.79/128;L1=14.96/32;L2=231.90/512
+sparse_threshold   0.075      0.668891   0.6400     0.6296     0.6800     0.6538     43           1.0211       30258/67200    100.8600     0.5497     2         
+  activations_by_layer: L0=63.68/128;L1=14.54/32;L2=224.36/512
+sparse_threshold   0.1        0.668789   0.6500     0.6364     0.7000     0.6667     43           1.0216       29363/67200    97.8767      0.5631     3         
+  activations_by_layer: L0=61.94/128;L1=14.14/32;L2=217.55/512
+--- compare split=test ---
+run_id=f9521d9d19c4 run_dir=runs/go_top6_output_heads_dsa/go_runs/f9521d9d19c4_rank4_128x32x512_sigmoid1_lr0p003_b32_s9 best_epoch=31 head=sigmoid1 split=test samples=100 out=runs/go_top6_output_heads_dsa/rank4_128x32x512_sigmoid1_lr0p003_b32_s9/compare_test.csv
+mode               threshold  loss       acc        precision  recall     f1         ms           speedup      active         avg_active   sparsity   mismatch  
+dense              0          0.676643   0.5800     0.5909     0.5200     0.5532     48           1.0000       67200/67200    224.0000     0.0000     0         
+  activations_by_layer: L0=128.00/128;L1=32.00/32;L2=512.00/512
+sparse_exact       0          0.676643   0.5800     0.5909     0.5200     0.5532     50           1.0195       33285/67200    110.9500     0.5047     0         
+  activations_by_layer: L0=70.19/128;L1=15.74/32;L2=246.92/512
+sparse_threshold   0.025      0.676990   0.5600     0.5682     0.5000     0.5319     47           1.0201       32335/67200    107.7833     0.5188     2         
+  activations_by_layer: L0=68.29/128;L1=15.31/32;L2=239.75/512
+sparse_threshold   0.05       0.675561   0.5600     0.5652     0.5200     0.5417     45           1.0206       31347/67200    104.4900     0.5335     2         
+  activations_by_layer: L0=66.41/128;L1=14.85/32;L2=232.21/512
+sparse_threshold   0.075      0.678008   0.5700     0.5778     0.5200     0.5474     43           1.0211       30406/67200    101.3533     0.5475     1         
+  activations_by_layer: L0=64.60/128;L1=14.53/32;L2=224.93/512
+sparse_threshold   0.1        0.676326   0.5800     0.5909     0.5200     0.5532     47           1.0216       29418/67200    98.0600      0.5622     2         
+  activations_by_layer: L0=62.57/128;L1=14.10/32;L2=217.51/512
+--- bench split=test ---
+run_id=f9521d9d19c4 run_dir=runs/go_top6_output_heads_dsa/go_runs/f9521d9d19c4_rank4_128x32x512_sigmoid1_lr0p003_b32_s9 best_epoch=31 head=sigmoid1 split=test samples=100 repeat=300 warmup=20 gomaxprocs=16 out=runs/go_top6_output_heads_dsa/rank4_128x32x512_sigmoid1_lr0p003_b32_s9/bench_test.csv
+mode               threshold  total_ms     ns_forward     forward/s    speedup      ops_saved    active         sparsity   checksum  
+dense              0          14428        480934.48      2079.29      1.0000       0.0000       67200/67200    0.0000     14220.6511
+  activations_by_layer: L0=128.00/128;L1=32.00/32;L2=512.00/512
+sparse_exact       0          11401        380039.45      2631.31      1.0195       0.0191       33285/67200    0.5047     14220.6511
+  activations_by_layer: L0=70.19/128;L1=15.74/32;L2=246.92/512
+sparse_threshold   0.025      11373        379117.30      2637.71      1.0201       0.0197       32335/67200    0.5188     14229.1587
+  activations_by_layer: L0=68.29/128;L1=15.31/32;L2=239.75/512
+sparse_threshold   0.05       11337        377921.84      2646.05      1.0206       0.0202       31347/67200    0.5335     14251.0287
+  activations_by_layer: L0=66.41/128;L1=14.85/32;L2=232.21/512
+sparse_threshold   0.075      11540        384693.43      2599.47      1.0211       0.0207       30406/67200    0.5475     14258.9390
+  activations_by_layer: L0=64.60/128;L1=14.53/32;L2=224.93/512
+sparse_threshold   0.1        11501        383377.90      2608.39      1.0216       0.0212       29418/67200    0.5622     14328.5494
+  activations_by_layer: L0=62.57/128;L1=14.10/32;L2=217.51/512
+
+=== rank=5 label=rank5_64x32x512_softmax2_lr0p003_b16_s11 hidden=64x32x512 head=softmax2 lr=0.003 batch=16 seed=11 ===
+--- compare split=validation ---
+run_id=09236c8f94e3 run_dir=runs/go_top6_output_heads_dsa/go_runs/09236c8f94e3_rank5_64x32x512_softmax2_lr0p003_b16_s11 best_epoch=72 head=softmax2 split=validation samples=100 out=runs/go_top6_output_heads_dsa/rank5_64x32x512_softmax2_lr0p003_b16_s11/compare_validation.csv
+mode               threshold  loss       acc        precision  recall     f1         ms           speedup      active         avg_active   sparsity   mismatch  
+dense              0          1.222783   0.5900     0.5584     0.8600     0.6772     25           1.0000       60800/60800    202.6667     0.0000     0         
+  activations_by_layer: L0=64.00/64;L1=32.00/32;L2=512.00/512
+sparse_exact       0          1.222783   0.5900     0.5584     0.8600     0.6772     23           1.0371       28263/60800    94.2100      0.5351     0         
+  activations_by_layer: L0=29.00/64;L1=15.58/32;L2=238.05/512
+sparse_threshold   0.025      1.223157   0.5900     0.5584     0.8600     0.6772     23           1.0380       27425/60800    91.4167      0.5489     0         
+  activations_by_layer: L0=28.32/64;L1=15.20/32;L2=230.73/512
+sparse_threshold   0.05       1.224161   0.5900     0.5584     0.8600     0.6772     23           1.0389       26652/60800    88.8400      0.5616     0         
+  activations_by_layer: L0=27.58/64;L1=14.80/32;L2=224.14/512
+sparse_threshold   0.075      1.220874   0.5700     0.5443     0.8600     0.6667     24           1.0398       25886/60800    86.2867      0.5742     2         
+  activations_by_layer: L0=26.89/64;L1=14.44/32;L2=217.53/512
+sparse_threshold   0.1        1.214668   0.5500     0.5309     0.8600     0.6565     23           1.0403       25152/60800    83.8400      0.5863     4         
+  activations_by_layer: L0=26.23/64;L1=14.24/32;L2=211.05/512
+--- compare split=test ---
+run_id=09236c8f94e3 run_dir=runs/go_top6_output_heads_dsa/go_runs/09236c8f94e3_rank5_64x32x512_softmax2_lr0p003_b16_s11 best_epoch=72 head=softmax2 split=test samples=100 out=runs/go_top6_output_heads_dsa/rank5_64x32x512_softmax2_lr0p003_b16_s11/compare_test.csv
+mode               threshold  loss       acc        precision  recall     f1         ms           speedup      active         avg_active   sparsity   mismatch  
+dense              0          0.909004   0.5400     0.5278     0.7600     0.6230     27           1.0000       60800/60800    202.6667     0.0000     0         
+  activations_by_layer: L0=64.00/64;L1=32.00/32;L2=512.00/512
+sparse_exact       0          0.909004   0.5400     0.5278     0.7600     0.6230     25           1.0368       28296/60800    94.3200      0.5346     0         
+  activations_by_layer: L0=29.34/64;L1=15.70/32;L2=237.92/512
+sparse_threshold   0.025      0.910306   0.5400     0.5278     0.7600     0.6230     24           1.0376       27573/60800    91.9100      0.5465     0         
+  activations_by_layer: L0=28.51/64;L1=15.36/32;L2=231.86/512
+sparse_threshold   0.05       0.913296   0.5400     0.5278     0.7600     0.6230     26           1.0384       26822/60800    89.4067      0.5588     0         
+  activations_by_layer: L0=27.69/64;L1=15.05/32;L2=225.48/512
+sparse_threshold   0.075      0.914189   0.5400     0.5278     0.7600     0.6230     26           1.0392       26012/60800    86.7067      0.5722     0         
+  activations_by_layer: L0=26.87/64;L1=14.71/32;L2=218.54/512
+sparse_threshold   0.1        0.919856   0.5300     0.5211     0.7400     0.6116     23           1.0401       25252/60800    84.1733      0.5847     1         
+  activations_by_layer: L0=26.03/64;L1=14.36/32;L2=212.13/512
+--- bench split=test ---
+run_id=09236c8f94e3 run_dir=runs/go_top6_output_heads_dsa/go_runs/09236c8f94e3_rank5_64x32x512_softmax2_lr0p003_b16_s11 best_epoch=72 head=softmax2 split=test samples=100 repeat=300 warmup=20 gomaxprocs=16 out=runs/go_top6_output_heads_dsa/rank5_64x32x512_softmax2_lr0p003_b16_s11/bench_test.csv
+mode               threshold  total_ms     ns_forward     forward/s    speedup      ops_saved    active         sparsity   checksum  
+dense              0          7829         260981.56      3831.69      1.0000       0.0000       60800/60800    0.0000     19582.7629
+  activations_by_layer: L0=64.00/64;L1=32.00/32;L2=512.00/512
+sparse_exact       0          6207         206902.93      4833.18      1.0368       0.0355       28296/60800    0.5346     19582.7629
+  activations_by_layer: L0=29.34/64;L1=15.70/32;L2=237.92/512
+sparse_threshold   0.025      6189         206316.13      4846.93      1.0376       0.0363       27573/60800    0.5465     19585.6845
+  activations_by_layer: L0=28.51/64;L1=15.36/32;L2=231.86/512
+sparse_threshold   0.05       6181         206060.01      4852.96      1.0384       0.0370       26822/60800    0.5588     19596.0581
+  activations_by_layer: L0=27.69/64;L1=15.05/32;L2=225.48/512
+sparse_threshold   0.075      6169         205645.23      4862.74      1.0392       0.0377       26012/60800    0.5722     19667.7042
+  activations_by_layer: L0=26.87/64;L1=14.71/32;L2=218.54/512
+sparse_threshold   0.1        6154         205137.58      4874.78      1.0401       0.0385       25252/60800    0.5847     19653.0584
+  activations_by_layer: L0=26.03/64;L1=14.36/32;L2=212.13/512
+
+=== rank=6 label=rank6_128x32x512_softmax2_lr0p003_b32_s12 hidden=128x32x512 head=softmax2 lr=0.003 batch=32 seed=12 ===
+--- compare split=validation ---
+run_id=4b01605abc04 run_dir=runs/go_top6_output_heads_dsa/go_runs/4b01605abc04_rank6_128x32x512_softmax2_lr0p003_b32_s12 best_epoch=23 head=softmax2 split=validation samples=100 out=runs/go_top6_output_heads_dsa/rank6_128x32x512_softmax2_lr0p003_b32_s12/compare_validation.csv
+mode               threshold  loss       acc        precision  recall     f1         ms           speedup      active         avg_active   sparsity   mismatch  
+dense              0          0.736746   0.5600     0.5417     0.7800     0.6393     48           1.0000       67200/67200    224.0000     0.0000     0         
+  activations_by_layer: L0=128.00/128;L1=32.00/32;L2=512.00/512
+sparse_exact       0          0.736746   0.5600     0.5417     0.7800     0.6393     44           1.0214       31957/67200    106.5233     0.5244     0         
+  activations_by_layer: L0=63.98/128;L1=14.75/32;L2=240.84/512
+sparse_threshold   0.025      0.736114   0.5600     0.5417     0.7800     0.6393     43           1.0219       31103/67200    103.6767     0.5372     0         
+  activations_by_layer: L0=61.98/128;L1=14.38/32;L2=234.67/512
+sparse_threshold   0.05       0.736692   0.5500     0.5352     0.7600     0.6281     44           1.0223       30303/67200    101.0100     0.5491     1         
+  activations_by_layer: L0=60.31/128;L1=14.08/32;L2=228.64/512
+sparse_threshold   0.075      0.738241   0.5600     0.5417     0.7800     0.6393     43           1.0227       29487/67200    98.2900      0.5612     0         
+  activations_by_layer: L0=58.62/128;L1=13.84/32;L2=222.41/512
+sparse_threshold   0.1        0.740633   0.5500     0.5352     0.7600     0.6281     43           1.0232       28671/67200    95.5700      0.5733     1         
+  activations_by_layer: L0=56.93/128;L1=13.43/32;L2=216.35/512
+--- compare split=test ---
+run_id=4b01605abc04 run_dir=runs/go_top6_output_heads_dsa/go_runs/4b01605abc04_rank6_128x32x512_softmax2_lr0p003_b32_s12 best_epoch=23 head=softmax2 split=test samples=100 out=runs/go_top6_output_heads_dsa/rank6_128x32x512_softmax2_lr0p003_b32_s12/compare_test.csv
+mode               threshold  loss       acc        precision  recall     f1         ms           speedup      active         avg_active   sparsity   mismatch  
+dense              0          0.722506   0.4400     0.4571     0.6400     0.5333     50           1.0000       67200/67200    224.0000     0.0000     0         
+  activations_by_layer: L0=128.00/128;L1=32.00/32;L2=512.00/512
+sparse_exact       0          0.722506   0.4400     0.4571     0.6400     0.5333     46           1.0208       32042/67200    106.8067     0.5232     0         
+  activations_by_layer: L0=64.61/128;L1=15.28/32;L2=240.53/512
+sparse_threshold   0.025      0.722961   0.4400     0.4571     0.6400     0.5333     47           1.0214       31211/67200    104.0367     0.5356     0         
+  activations_by_layer: L0=62.73/128;L1=14.88/32;L2=234.50/512
+sparse_threshold   0.05       0.723227   0.4400     0.4571     0.6400     0.5333     46           1.0219       30431/67200    101.4367     0.5472     0         
+  activations_by_layer: L0=61.07/128;L1=14.48/32;L2=228.76/512
+sparse_threshold   0.075      0.725663   0.4400     0.4571     0.6400     0.5333     48           1.0224       29594/67200    98.6467      0.5596     0         
+  activations_by_layer: L0=59.21/128;L1=14.04/32;L2=222.69/512
+sparse_threshold   0.1        0.726890   0.4400     0.4571     0.6400     0.5333     45           1.0230       28745/67200    95.8167      0.5722     0         
+  activations_by_layer: L0=57.49/128;L1=13.57/32;L2=216.39/512
+--- bench split=test ---
+run_id=4b01605abc04 run_dir=runs/go_top6_output_heads_dsa/go_runs/4b01605abc04_rank6_128x32x512_softmax2_lr0p003_b32_s12 best_epoch=23 head=softmax2 split=test samples=100 repeat=300 warmup=20 gomaxprocs=16 out=runs/go_top6_output_heads_dsa/rank6_128x32x512_softmax2_lr0p003_b32_s12/bench_test.csv
+mode               threshold  total_ms     ns_forward     forward/s    speedup      ops_saved    active         sparsity   checksum  
+dense              0          14550        485016.81      2061.78      1.0000       0.0000       67200/67200    0.0000     17107.5773
+  activations_by_layer: L0=128.00/128;L1=32.00/32;L2=512.00/512
+sparse_exact       0          13223        440797.53      2268.62      1.0208       0.0204       32042/67200    0.5232     17107.5773
+  activations_by_layer: L0=64.61/128;L1=15.28/32;L2=240.53/512
+sparse_threshold   0.025      12254        408480.14      2448.10      1.0214       0.0209       31211/67200    0.5356     17108.0156
+  activations_by_layer: L0=62.73/128;L1=14.88/32;L2=234.50/512
+sparse_threshold   0.05       11977        399246.75      2504.72      1.0219       0.0214       30431/67200    0.5472     17116.2168
+  activations_by_layer: L0=61.07/128;L1=14.48/32;L2=228.76/512
+sparse_threshold   0.075      11570        385685.45      2592.79      1.0224       0.0219       29594/67200    0.5596     17094.9812
+  activations_by_layer: L0=59.21/128;L1=14.04/32;L2=222.69/512
+sparse_threshold   0.1        11511        383721.13      2606.06      1.0230       0.0225       28745/67200    0.5722     17083.9473
+  activations_by_layer: L0=57.49/128;L1=13.57/32;L2=216.39/512
+
+done
+finished_at=2026-06-19T17:16:36-03:00
+manifest=runs/go_top6_output_heads_dsa/top6_manifest.csv
+log=runs/go_top6_output_heads_dsa/logs/run_20260619_165717.log
+per-candidate outputs are under runs/go_top6_output_heads_dsa/<label>/

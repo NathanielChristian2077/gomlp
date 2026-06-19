@@ -1,0 +1,24 @@
+{
+  "run_id": "bfc4ca1b4d3f",
+  "name": "rank3_64x32x512_sigmoid1_lr0p003_b16_s25",
+  "run_directory": "runs/go_top6_output_heads_dsa/go_runs/bfc4ca1b4d3f_rank3_64x32x512_sigmoid1_lr0p003_b16_s25",
+  "completed": true,
+  "loaded_from_summary": false,
+  "best_epoch": 28,
+  "best_validation_loss": 0.7432698405980888,
+  "best_validation_accuracy": 0.54,
+  "output_head": "sigmoid1",
+  "test_loss": 0.7341632846218631,
+  "test_accuracy": 0.5,
+  "test_precision": 0.5,
+  "test_recall": 0.18,
+  "test_f1": 0.2647058823529412,
+  "confusion": {
+    "TruePositive": 9,
+    "TrueNegative": 41,
+    "FalsePositive": 9,
+    "FalseNegative": 41
+  },
+  "train_time_ms": 137873,
+  "epochs_run": 500
+}

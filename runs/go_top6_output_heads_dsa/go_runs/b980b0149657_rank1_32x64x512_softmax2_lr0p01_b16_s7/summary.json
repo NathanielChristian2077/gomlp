@@ -1,0 +1,24 @@
+{
+  "run_id": "b980b0149657",
+  "name": "rank1_32x64x512_softmax2_lr0p01_b16_s7",
+  "run_directory": "runs/go_top6_output_heads_dsa/go_runs/b980b0149657_rank1_32x64x512_softmax2_lr0p01_b16_s7",
+  "completed": true,
+  "loaded_from_summary": false,
+  "best_epoch": 11,
+  "best_validation_loss": 0.6894364825203588,
+  "best_validation_accuracy": 0.59,
+  "output_head": "softmax2",
+  "test_loss": 0.6897315588623754,
+  "test_accuracy": 0.51,
+  "test_precision": 0.6,
+  "test_recall": 0.06,
+  "test_f1": 0.1090909090909091,
+  "confusion": {
+    "TruePositive": 3,
+    "TrueNegative": 48,
+    "FalsePositive": 2,
+    "FalseNegative": 47
+  },
+  "train_time_ms": 83624,
+  "epochs_run": 500
+}

@@ -1,9 +1,0 @@
-metric,value
-true_negative,14
-false_positive,36
-false_negative,8
-true_positive,42
-accuracy,0.56000000
-precision,0.53846154
-recall,0.84000000
-f1,0.65625000
