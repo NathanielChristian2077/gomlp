@@ -44,6 +44,7 @@ func main() {
 	batchSize := flag.Int("batch", 0, "mini-batch size; if <= 0, full-batch training is used")
 	seed := flag.Int64("seed", 42, "random seed")
 	learningRate := flag.Float64("lr", -1, "learning rate; if negative, the dataset default is selected")
+	outputHead := flag.String("head", string(nn.OutputHeadSigmoid1), "output head: sigmoid1 or softmax2")
 	runsRoot := flag.String("runs", "runs", "root directory used to find or create the dense training run")
 	runName := flag.String("name", "dense_bench", "human-readable run name for the dense model")
 	checkpointPath := flag.String("checkpoint", "", "optional checkpoint path; if set, training/cache lookup is skipped")
@@ -63,6 +64,9 @@ func main() {
 	}
 	if *gomaxprocs > 0 {
 		runtime.GOMAXPROCS(*gomaxprocs)
+	}
+	if _, err := nn.NormalizeOutputHead(*outputHead); err != nil {
+		log.Fatal(err)
 	}
 
 	hiddenSizes, err := experiment.ParseHiddenArchitecture(*hiddenRaw)
@@ -94,6 +98,7 @@ func main() {
 		*batchSize,
 		*seed,
 		*learningRate,
+		*outputHead,
 		*runsRoot,
 		dataset,
 	)
@@ -122,11 +127,11 @@ func main() {
 		results = append(results, result)
 	}
 
-	if err := writeBenchCSV(out, runID, *runName, hiddenLabel, bestEpoch, results); err != nil {
+	if err := writeBenchCSV(out, runID, *runName, hiddenLabel, string(model.Head()), bestEpoch, results); err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("run_id=%s run_dir=%s best_epoch=%d split=%s samples=%d repeat=%d warmup=%d gomaxprocs=%d out=%s\n", runID, runDir, bestEpoch, normalizedSplit, len(samples), *repeats, *warmup, runtime.GOMAXPROCS(0), out)
+	fmt.Printf("run_id=%s run_dir=%s best_epoch=%d head=%s split=%s samples=%d repeat=%d warmup=%d gomaxprocs=%d out=%s\n", runID, runDir, bestEpoch, model.Head(), normalizedSplit, len(samples), *repeats, *warmup, runtime.GOMAXPROCS(0), out)
 	fmt.Printf("%-18s %-10s %-12s %-14s %-12s %-12s %-12s %-14s %-10s %-10s\n", "mode", "threshold", "total_ms", "ns_forward", "forward/s", "speedup", "ops_saved", "active", "sparsity", "checksum")
 	for _, result := range results {
 		opsSaved := 0.0
@@ -150,7 +155,7 @@ func main() {
 	}
 }
 
-func loadOrTrainModel(checkpointPath, runName, datasetPath string, epochs int, hiddenSizes []int, batchSize int, seed int64, learningRate float64, runsRoot string, dataset experiment.DatasetBundle) (*nn.MLP, string, string, int, error) {
+func loadOrTrainModel(checkpointPath, runName, datasetPath string, epochs int, hiddenSizes []int, batchSize int, seed int64, learningRate float64, outputHead string, runsRoot string, dataset experiment.DatasetBundle) (*nn.MLP, string, string, int, error) {
 	if checkpointPath != "" {
 		checkpoint, err := experiment.LoadCheckpoint(checkpointPath)
 		if err != nil {
@@ -171,6 +176,7 @@ func loadOrTrainModel(checkpointPath, runName, datasetPath string, epochs int, h
 		BatchSize:    batchSize,
 		Seed:         seed,
 		LearningRate: learningRate,
+		OutputHead:   outputHead,
 		OutputRoot:   runsRoot,
 	}
 
@@ -427,7 +433,7 @@ func layerActivationSummary(activeTotals, slotTotals []int, samples int) string 
 	return strings.Join(parts, ";")
 }
 
-func writeBenchCSV(path string, runID string, runName string, hiddenLabel string, bestEpoch int, results []benchResult) error {
+func writeBenchCSV(path string, runID string, runName string, hiddenLabel string, outputHead string, bestEpoch int, results []benchResult) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
@@ -444,6 +450,7 @@ func writeBenchCSV(path string, runID string, runName string, hiddenLabel string
 		"run_id",
 		"run_name",
 		"hidden",
+		"output_head",
 		"best_epoch",
 		"mode",
 		"threshold",
@@ -478,6 +485,7 @@ func writeBenchCSV(path string, runID string, runName string, hiddenLabel string
 			runID,
 			runName,
 			hiddenLabel,
+			outputHead,
 			fmt.Sprintf("%d", bestEpoch),
 			result.Mode,
 			formatFloat(result.Threshold),
