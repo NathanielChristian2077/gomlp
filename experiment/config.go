@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"unicode"
+
+	"github.com/NathanielChristian2077/gomlp/nn"
 )
 
 // RunConfig descreve uma execução treinável da MLP.
@@ -20,6 +22,7 @@ type RunConfig struct {
 	BatchSize    int     `json:"batch_size"`
 	Seed         int64   `json:"seed"`
 	LearningRate float64 `json:"learning_rate"`
+	OutputHead   string  `json:"output_head"`
 	OutputRoot   string  `json:"output_root"`
 	LogEvery     int     `json:"log_every"`
 }
@@ -31,6 +34,7 @@ type runFingerprint struct {
 	BatchSize    int     `json:"batch_size"`
 	Seed         int64   `json:"seed"`
 	LearningRate float64 `json:"learning_rate"`
+	OutputHead   string  `json:"output_head"`
 }
 
 // Normalize aplica apenas defaults seguros e preserva valores inválidos para Validate reportar.
@@ -47,11 +51,14 @@ func (c RunConfig) Normalize(defaultLearningRate float64) RunConfig {
 	if out.Seed == 0 {
 		out.Seed = 42
 	}
+	if out.OutputHead == "" {
+		out.OutputHead = string(nn.OutputHeadSigmoid1)
+	}
 	if out.OutputRoot == "" {
 		out.OutputRoot = "runs"
 	}
 	if out.Name == "" {
-		out.Name = fmt.Sprintf("dense_h%s_lr%g_bs%d_seed%d", HiddenSizesLabel(out.HiddenSizes), out.LearningRate, out.BatchSize, out.Seed)
+		out.Name = fmt.Sprintf("dense_h%s_%s_lr%g_bs%d_seed%d", HiddenSizesLabel(out.HiddenSizes), out.OutputHead, out.LearningRate, out.BatchSize, out.Seed)
 	}
 	return out
 }
@@ -71,10 +78,21 @@ func (c RunConfig) Validate() error {
 	if c.LearningRate <= 0 {
 		return fmt.Errorf("learning rate must be positive, got %g", c.LearningRate)
 	}
+	if _, err := nn.NormalizeOutputHead(c.OutputHead); err != nil {
+		return err
+	}
 	if c.OutputRoot == "" {
 		return fmt.Errorf("output root cannot be empty")
 	}
 	return nil
+}
+
+func (c RunConfig) NormalizedOutputHead() string {
+	head, err := nn.NormalizeOutputHead(c.OutputHead)
+	if err != nil {
+		return c.OutputHead
+	}
+	return string(head)
 }
 
 func (c RunConfig) ID() (string, error) {
@@ -85,6 +103,7 @@ func (c RunConfig) ID() (string, error) {
 		BatchSize:    c.BatchSize,
 		Seed:         c.Seed,
 		LearningRate: c.LearningRate,
+		OutputHead:   c.NormalizedOutputHead(),
 	}
 
 	payload, err := json.Marshal(fingerprint)
