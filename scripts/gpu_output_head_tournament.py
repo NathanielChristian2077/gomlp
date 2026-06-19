@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Compare binary-output heads for the frozen top MLP candidates.
+"""Compare the two valid binary-output formulations for the frozen top MLPs.
 
 Modes:
   sigmoid1: one output logit trained with BCEWithLogitsLoss.
   softmax2: two output logits trained with CrossEntropyLoss.
-  sigmoid2: two independent output logits trained with one-hot BCEWithLogitsLoss.
 
 A one-neuron softmax is intentionally not implemented because it is degenerate:
 softmax over a single logit is always 1, so it cannot represent cat vs dog.
@@ -34,7 +33,7 @@ import torch.nn.functional as F
 from gpu_search_pytorch import configure_torch, load_split, resolve_device
 
 
-SEARCH_VERSION = "gpu-output-head-tournament-v1"
+SEARCH_VERSION = "gpu-output-head-tournament-v2"
 INPUT_SIZE = 64 * 64
 MIN_EPOCHS = 30
 PATIENCE = 35
@@ -48,7 +47,8 @@ DEFAULT_CANDIDATES = (
     "64x32x512:0.003:16",
     "128x32x512:0.003:32",
 )
-DEFAULT_MODES = ("sigmoid1", "softmax2", "sigmoid2")
+DEFAULT_MODES = ("sigmoid1", "softmax2")
+VALID_MODES = set(DEFAULT_MODES)
 
 
 @dataclass(frozen=True)
@@ -178,15 +178,15 @@ class HeadMLP(torch_nn.Module):
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Compare sigmoid/softmax output heads on frozen top MLP candidates.")
+    parser = argparse.ArgumentParser(description="Compare sigmoid1 vs softmax2 on frozen top MLP candidates.")
     parser.add_argument("--dataset", default="./dataset", help="dataset root with train/cat, train/dog, validation/cat and validation/dog")
-    parser.add_argument("--runs", default="runs/output_head_tournament_v1", help="output directory")
+    parser.add_argument("--runs", default="runs/output_head_tournament_v2", help="output directory")
     parser.add_argument("--device", default="auto", help="auto, cuda, cuda:0 or cpu")
     parser.add_argument("--workers", type=int, default=4, help="CPU thread count used by PyTorch")
     parser.add_argument("--seeds", default="1-42", help="seed list/range, for example 1-42 or 1,3,5")
     parser.add_argument("--max-epochs", type=int, default=500, help="maximum epochs per run")
     parser.add_argument("--candidate", action="append", default=[], help="candidate spec hidden:lr:batch; can be repeated")
-    parser.add_argument("--mode", action="append", default=[], help="head mode: sigmoid1, softmax2 or sigmoid2; can be repeated")
+    parser.add_argument("--mode", action="append", default=[], help="head mode: sigmoid1 or softmax2; can be repeated")
     parser.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True, help="reuse completed rows from summary.csv")
     parser.add_argument("--deterministic", action="store_true", help="request deterministic PyTorch algorithms when possible")
     args = parser.parse_args()
@@ -197,16 +197,16 @@ def main() -> None:
         raise SystemExit("--max-epochs must be positive")
 
     seeds = tuple(parse_seeds(args.seeds))
-    candidate_specs = args.candidate if args.candidate else list(DEFAULT_CANDIDATES)
-    modes = args.mode if args.mode else list(DEFAULT_MODES)
-    modes = validate_modes(modes)
+    if not seeds:
+        raise SystemExit("--seeds produced no seed values")
 
-    configs: List[CandidateConfig] = []
-    for spec in candidate_specs:
-        hidden, lr, batch = parse_candidate(spec)
-        for mode in modes:
-            configs.append(CandidateConfig(hidden=hidden, learning_rate=lr, batch_size=batch, head_mode=mode))
-    configs = unique_configs(configs)
+    candidate_specs = args.candidate if args.candidate else list(DEFAULT_CANDIDATES)
+    modes = validate_modes(args.mode if args.mode else list(DEFAULT_MODES))
+    configs = unique_configs(
+        CandidateConfig(hidden=hidden, learning_rate=lr, batch_size=batch, head_mode=mode)
+        for hidden, lr, batch in (parse_candidate(spec) for spec in candidate_specs)
+        for mode in modes
+    )
 
     runs_dir = Path(args.runs)
     runs_dir.mkdir(parents=True, exist_ok=True)
@@ -254,8 +254,7 @@ def main() -> None:
 def run_or_load(config: CandidateConfig, seed: int, stage: Stage, runs_dir: Path, train_x: torch.Tensor, train_y: torch.Tensor, val_x: torch.Tensor, val_y: torch.Tensor, existing: Dict[str, RunResult]) -> RunResult:
     run_id = make_run_id(config, seed, stage)
     if run_id in existing:
-        cached = dataclasses.replace(existing[run_id], cached=True)
-        return cached
+        return dataclasses.replace(existing[run_id], cached=True)
     run_dir = runs_dir / stage.name / f"{run_id}_{sanitize(config.hidden_label)}_lr{lr_label(config.learning_rate)}_bs{config.batch_size}_{config.head_mode}_seed{seed}"
     try:
         return train_one(config, seed, stage, run_id, run_dir, train_x, train_y, val_x, val_y)
@@ -345,21 +344,44 @@ def train_one(config: CandidateConfig, seed: int, stage: Stage, run_id: str, run
     }, run_dir / "best.pt")
 
     return RunResult(
-        run_id=run_id, stage=stage.name, completed=True, cached=False,
-        hidden=config.hidden_label, depth=len(config.hidden), parameter_count=parameter_count(INPUT_SIZE, config.hidden, output_dim),
-        learning_rate=config.learning_rate, batch_size=config.batch_size, effective_batch_size=batch,
-        head_mode=config.head_mode, output_dim=output_dim, seed=seed, max_epochs=stage.max_epochs,
-        epochs_run=len(train_losses), stop_reason=stop_reason, best_epoch=best_epoch,
-        best_train_loss=best_train.loss, best_train_accuracy=best_train.accuracy,
-        best_train_precision=best_train.precision, best_train_recall=best_train.recall, best_train_f1=best_train.f1,
-        best_val_loss=best_val.loss, best_val_accuracy=best_val.accuracy,
-        best_val_precision=best_val.precision, best_val_recall=best_val.recall, best_val_f1=best_val.f1,
-        final_train_loss=final_train.loss, final_train_accuracy=final_train.accuracy,
-        final_val_loss=final_val.loss, final_val_accuracy=final_val.accuracy,
+        run_id=run_id,
+        stage=stage.name,
+        completed=True,
+        cached=False,
+        hidden=config.hidden_label,
+        depth=len(config.hidden),
+        parameter_count=parameter_count(INPUT_SIZE, config.hidden, output_dim),
+        learning_rate=config.learning_rate,
+        batch_size=config.batch_size,
+        effective_batch_size=batch,
+        head_mode=config.head_mode,
+        output_dim=output_dim,
+        seed=seed,
+        max_epochs=stage.max_epochs,
+        epochs_run=len(train_losses),
+        stop_reason=stop_reason,
+        best_epoch=best_epoch,
+        best_train_loss=best_train.loss,
+        best_train_accuracy=best_train.accuracy,
+        best_train_precision=best_train.precision,
+        best_train_recall=best_train.recall,
+        best_train_f1=best_train.f1,
+        best_val_loss=best_val.loss,
+        best_val_accuracy=best_val.accuracy,
+        best_val_precision=best_val.precision,
+        best_val_recall=best_val.recall,
+        best_val_f1=best_val.f1,
+        final_train_loss=final_train.loss,
+        final_train_accuracy=final_train.accuracy,
+        final_val_loss=final_val.loss,
+        final_val_accuracy=final_val.accuracy,
         generalization_gap=best_train.accuracy - best_val.accuracy,
-        val_true_negative=best_val.true_negative, val_false_positive=best_val.false_positive,
-        val_false_negative=best_val.false_negative, val_true_positive=best_val.true_positive,
-        train_time_ms=elapsed_ms, run_directory=str(run_dir), error="",
+        val_true_negative=best_val.true_negative,
+        val_false_positive=best_val.false_positive,
+        val_false_negative=best_val.false_negative,
+        val_true_positive=best_val.true_positive,
+        train_time_ms=elapsed_ms,
+        run_directory=str(run_dir),
     )
 
 
@@ -387,16 +409,13 @@ def loss_for_mode(logits: torch.Tensor, y: torch.Tensor, mode: str) -> torch.Ten
         return F.binary_cross_entropy_with_logits(logits.squeeze(1), y)
     if mode == "softmax2":
         return F.cross_entropy(logits, y.long())
-    if mode == "sigmoid2":
-        target = F.one_hot(y.long(), num_classes=2).to(dtype=torch.float32)
-        return F.binary_cross_entropy_with_logits(logits, target)
     raise ValueError(f"unknown mode: {mode}")
 
 
 def predict_class(logits: torch.Tensor, mode: str) -> torch.Tensor:
     if mode == "sigmoid1":
         return (torch.sigmoid(logits.squeeze(1)) >= 0.5).long()
-    if mode in {"softmax2", "sigmoid2"}:
+    if mode == "softmax2":
         return torch.argmax(logits, dim=1).long()
     raise ValueError(f"unknown mode: {mode}")
 
@@ -404,7 +423,7 @@ def predict_class(logits: torch.Tensor, mode: str) -> torch.Tensor:
 def output_dim_for_mode(mode: str) -> int:
     if mode == "sigmoid1":
         return 1
-    if mode in {"softmax2", "sigmoid2"}:
+    if mode == "softmax2":
         return 2
     raise ValueError(f"unknown mode: {mode}")
 
@@ -434,14 +453,13 @@ def has_low_learning(train_losses: Sequence[float], val_losses: Sequence[float])
         return False
     previous = len(train_losses) - 1 - LOW_LEARNING_WINDOW
     last = len(train_losses) - 1
-    return (train_losses[previous] - train_losses[last] < LOW_LEARNING_DELTA and val_losses[previous] - val_losses[last] < LOW_LEARNING_DELTA)
+    return train_losses[previous] - train_losses[last] < LOW_LEARNING_DELTA and val_losses[previous] - val_losses[last] < LOW_LEARNING_DELTA
 
 
 def aggregate_results(results: Iterable[RunResult]) -> List[Aggregate]:
     grouped: Dict[Tuple[str, float, int, str], List[RunResult]] = {}
     for result in results:
-        key = (result.hidden, result.learning_rate, result.batch_size, result.head_mode)
-        grouped.setdefault(key, []).append(result)
+        grouped.setdefault((result.hidden, result.learning_rate, result.batch_size, result.head_mode), []).append(result)
 
     aggregates: List[Aggregate] = []
     for (hidden, lr, batch, mode), values in grouped.items():
@@ -462,12 +480,28 @@ def aggregate_results(results: Iterable[RunResult]) -> List[Aggregate]:
         gap_mean = mean(gap_abs)
         score = acc_mean + 0.50 * f1_mean - 0.50 * acc_std - 0.25 * gap_mean + 0.10 * min(acc)
         aggregates.append(Aggregate(
-            hidden=hidden, learning_rate=lr, batch_size=batch, head_mode=mode,
-            parameter_count=completed[0].parameter_count, completed=len(completed), failed=len(failed), score=score,
-            acc_mean=acc_mean, acc_std=acc_std, acc_min=min(acc), acc_max=max(acc),
-            f1_mean=f1_mean, f1_std=f1_std, loss_mean=mean(loss), gap_abs_mean=gap_mean,
-            epochs_mean=mean(epochs), best_seed=best.seed, best_seed_acc=best.best_val_accuracy,
-            best_seed_f1=best.best_val_f1, best_seed_loss=best.best_val_loss, best_seed_gap=best.generalization_gap,
+            hidden=hidden,
+            learning_rate=lr,
+            batch_size=batch,
+            head_mode=mode,
+            parameter_count=completed[0].parameter_count,
+            completed=len(completed),
+            failed=len(failed),
+            score=score,
+            acc_mean=acc_mean,
+            acc_std=acc_std,
+            acc_min=min(acc),
+            acc_max=max(acc),
+            f1_mean=f1_mean,
+            f1_std=f1_std,
+            loss_mean=mean(loss),
+            gap_abs_mean=gap_mean,
+            epochs_mean=mean(epochs),
+            best_seed=best.seed,
+            best_seed_acc=best.best_val_accuracy,
+            best_seed_f1=best.best_val_f1,
+            best_seed_loss=best.best_val_loss,
+            best_seed_gap=best.generalization_gap,
         ))
     aggregates.sort(key=lambda r: (-r.score, -r.acc_mean, -r.f1_mean, r.acc_std, r.gap_abs_mean))
     return aggregates
@@ -509,20 +543,19 @@ def parse_seeds(value: str) -> List[int]:
 
 
 def validate_modes(modes: Sequence[str]) -> List[str]:
-    valid = {"sigmoid1", "softmax2", "sigmoid2"}
     out = []
     for mode in modes:
         mode = mode.strip().lower()
         if mode == "softmax1":
             raise SystemExit("softmax1 is invalid: softmax over one logit is always 1")
-        if mode not in valid:
-            raise SystemExit(f"invalid mode {mode!r}; expected one of {sorted(valid)}")
+        if mode not in VALID_MODES:
+            raise SystemExit(f"invalid mode {mode!r}; expected one of {sorted(VALID_MODES)}")
         if mode not in out:
             out.append(mode)
     return out
 
 
-def unique_configs(configs: Sequence[CandidateConfig]) -> List[CandidateConfig]:
+def unique_configs(configs: Iterable[CandidateConfig]) -> List[CandidateConfig]:
     seen = set()
     out = []
     for config in configs:
@@ -555,13 +588,61 @@ def parameter_count(input_size: int, hidden: Sequence[int], output_dim: int) -> 
 
 
 def make_run_id(config: CandidateConfig, seed: int, stage: Stage) -> str:
-    payload = {"version": SEARCH_VERSION, "stage": dataclasses.asdict(stage), "hidden": list(config.hidden), "learning_rate": config.learning_rate, "batch_size": config.batch_size, "head_mode": config.head_mode, "seed": seed}
+    payload = {
+        "version": SEARCH_VERSION,
+        "stage": dataclasses.asdict(stage),
+        "hidden": list(config.hidden),
+        "learning_rate": config.learning_rate,
+        "batch_size": config.batch_size,
+        "head_mode": config.head_mode,
+        "seed": seed,
+    }
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()[:12]
 
 
 def failed_result(config: CandidateConfig, seed: int, stage: Stage, run_id: str, run_dir: Path, train_size: int, error: str) -> RunResult:
     output_dim = output_dim_for_mode(config.head_mode)
-    return RunResult(run_id, stage.name, False, False, config.hidden_label, len(config.hidden), parameter_count(INPUT_SIZE, config.hidden, output_dim), config.learning_rate, config.batch_size, effective_batch_size(config.batch_size, train_size), config.head_mode, output_dim, seed, stage.max_epochs, 0, "failed", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, str(run_dir), error)
+    return RunResult(
+        run_id=run_id,
+        stage=stage.name,
+        completed=False,
+        cached=False,
+        hidden=config.hidden_label,
+        depth=len(config.hidden),
+        parameter_count=parameter_count(INPUT_SIZE, config.hidden, output_dim),
+        learning_rate=config.learning_rate,
+        batch_size=config.batch_size,
+        effective_batch_size=effective_batch_size(config.batch_size, train_size),
+        head_mode=config.head_mode,
+        output_dim=output_dim,
+        seed=seed,
+        max_epochs=stage.max_epochs,
+        epochs_run=0,
+        stop_reason="failed",
+        best_epoch=0,
+        best_train_loss=0,
+        best_train_accuracy=0,
+        best_train_precision=0,
+        best_train_recall=0,
+        best_train_f1=0,
+        best_val_loss=0,
+        best_val_accuracy=0,
+        best_val_precision=0,
+        best_val_recall=0,
+        best_val_f1=0,
+        final_train_loss=0,
+        final_train_accuracy=0,
+        final_val_loss=0,
+        final_val_accuracy=0,
+        generalization_gap=0,
+        val_true_negative=0,
+        val_false_positive=0,
+        val_false_negative=0,
+        val_true_positive=0,
+        train_time_ms=0,
+        run_directory=str(run_dir),
+        error=error,
+    )
 
 
 def summary_fields() -> List[str]:
@@ -595,22 +676,50 @@ def load_existing_results(path: Path) -> Dict[str, RunResult]:
 
 def row_to_result(row: Dict[str, str]) -> RunResult:
     return RunResult(
-        run_id=row["run_id"], stage=row["stage"], completed=parse_bool(row["completed"]), cached=parse_bool(row.get("cached", "false")),
-        hidden=row["hidden"], depth=int(row["depth"]), parameter_count=int(row["parameter_count"]), learning_rate=float(row["learning_rate"]),
-        batch_size=int(row["batch_size"]), effective_batch_size=int(row["effective_batch_size"]), head_mode=row["head_mode"], output_dim=int(row["output_dim"]),
-        seed=int(row["seed"]), max_epochs=int(row["max_epochs"]), epochs_run=int(row["epochs_run"]), stop_reason=row["stop_reason"], best_epoch=int(row["best_epoch"]),
-        best_train_loss=float(row["best_train_loss"]), best_train_accuracy=float(row["best_train_accuracy"]), best_train_precision=float(row["best_train_precision"]),
-        best_train_recall=float(row["best_train_recall"]), best_train_f1=float(row["best_train_f1"]), best_val_loss=float(row["best_val_loss"]),
-        best_val_accuracy=float(row["best_val_accuracy"]), best_val_precision=float(row["best_val_precision"]), best_val_recall=float(row["best_val_recall"]),
-        best_val_f1=float(row["best_val_f1"]), final_train_loss=float(row["final_train_loss"]), final_train_accuracy=float(row["final_train_accuracy"]),
-        final_val_loss=float(row["final_val_loss"]), final_val_accuracy=float(row["final_val_accuracy"]), generalization_gap=float(row["generalization_gap"]),
-        val_true_negative=int(row["val_true_negative"]), val_false_positive=int(row["val_false_positive"]), val_false_negative=int(row["val_false_negative"]),
-        val_true_positive=int(row["val_true_positive"]), train_time_ms=int(row["train_time_ms"]), run_directory=row["run_directory"], error=row.get("error", ""),
+        run_id=row["run_id"],
+        stage=row["stage"],
+        completed=parse_bool(row["completed"]),
+        cached=parse_bool(row.get("cached", "false")),
+        hidden=row["hidden"],
+        depth=int(row["depth"]),
+        parameter_count=int(row["parameter_count"]),
+        learning_rate=float(row["learning_rate"]),
+        batch_size=int(row["batch_size"]),
+        effective_batch_size=int(row["effective_batch_size"]),
+        head_mode=row["head_mode"],
+        output_dim=int(row["output_dim"]),
+        seed=int(row["seed"]),
+        max_epochs=int(row["max_epochs"]),
+        epochs_run=int(row["epochs_run"]),
+        stop_reason=row["stop_reason"],
+        best_epoch=int(row["best_epoch"]),
+        best_train_loss=float(row["best_train_loss"]),
+        best_train_accuracy=float(row["best_train_accuracy"]),
+        best_train_precision=float(row["best_train_precision"]),
+        best_train_recall=float(row["best_train_recall"]),
+        best_train_f1=float(row["best_train_f1"]),
+        best_val_loss=float(row["best_val_loss"]),
+        best_val_accuracy=float(row["best_val_accuracy"]),
+        best_val_precision=float(row["best_val_precision"]),
+        best_val_recall=float(row["best_val_recall"]),
+        best_val_f1=float(row["best_val_f1"]),
+        final_train_loss=float(row["final_train_loss"]),
+        final_train_accuracy=float(row["final_train_accuracy"]),
+        final_val_loss=float(row["final_val_loss"]),
+        final_val_accuracy=float(row["final_val_accuracy"]),
+        generalization_gap=float(row["generalization_gap"]),
+        val_true_negative=int(row["val_true_negative"]),
+        val_false_positive=int(row["val_false_positive"]),
+        val_false_negative=int(row["val_false_negative"]),
+        val_true_positive=int(row["val_true_positive"]),
+        train_time_ms=int(row["train_time_ms"]),
+        run_directory=row["run_directory"],
+        error=row.get("error", ""),
     )
 
 
 def write_ranking(path: Path, aggregates: Sequence[Aggregate]) -> None:
-    fields = ["rank"] + list(dataclasses.asdict(aggregates[0]).keys()) if aggregates else ["rank"]
+    fields = ["rank"] + (list(dataclasses.asdict(aggregates[0]).keys()) if aggregates else [])
     with path.open("w", newline="", encoding="utf-8") as file:
         writer = csv.DictWriter(file, fieldnames=fields)
         writer.writeheader()
