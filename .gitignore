@@ -1,0 +1,22 @@
+# Local dataset and generated experiment artifacts
+/dataset/
+/runs/
+/results/
+*.gob
+*.pt
+*.log
+
+# Python tooling
+__pycache__/
+*.py[cod]
+.venv/
+
+# Go build and coverage outputs
+*.test
+*.out
+coverage.*
+
+# Editor and OS metadata
+.DS_Store
+.idea/
+.vscode/
