@@ -1,10 +1,5 @@
-# Local dataset and generated experiment artifacts
-/dataset/
+# Generated experiment scratch space. Curated results may live outside this directory.
 /runs/
-/results/
-*.gob
-*.pt
-*.log
 
 # Python tooling
 __pycache__/
