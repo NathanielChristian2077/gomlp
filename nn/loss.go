@@ -18,7 +18,12 @@ type SigmoidBinaryCrossEntropy struct {
 	Epsilon float64
 }
 
-// DefaultSigmoidBinaryCrossEntropy retorna a loss padrão da baseline.
+// DefaultLoss retorna a loss usada pela baseline densa atual.
+func DefaultLoss() Loss {
+	return DefaultSigmoidBinaryCrossEntropy()
+}
+
+// DefaultSigmoidBinaryCrossEntropy retorna a implementação concreta da BCE binária.
 func DefaultSigmoidBinaryCrossEntropy() SigmoidBinaryCrossEntropy {
 	return SigmoidBinaryCrossEntropy{Epsilon: defaultLossEpsilon}
 }
@@ -50,5 +55,5 @@ func (l SigmoidBinaryCrossEntropy) epsilon() float64 {
 
 // BinaryCrossEntropy preserva a API simples da baseline e delega para loss.go.
 func BinaryCrossEntropy(prediction, target float64) float64 {
-	return DefaultSigmoidBinaryCrossEntropy().Value(prediction, target)
+	return DefaultLoss().Value(prediction, target)
 }
