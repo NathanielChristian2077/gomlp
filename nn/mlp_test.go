@@ -9,12 +9,10 @@ type sample struct {
 
 func averageLoss(model *MLP, samples []sample) float64 {
 	total := 0.0
-
 	for _, s := range samples {
 		yHat := model.Forward(s.x)
-		total += BinaryCrossEntropy(yHat, s.y)
+		total += model.Loss(yHat, s.y)
 	}
-
 	return total / float64(len(samples))
 }
 
@@ -27,26 +25,22 @@ func TestMLPTrainingOnORSyntheticDataset(t *testing.T) {
 	}
 
 	model := NewMLP(2, 4, 42)
-
+	optimizer := NewSGDOptimizer(model, 0.1)
 	initialLoss := averageLoss(model, samples)
 
 	for epoch := 0; epoch < 3000; epoch++ {
 		model.ZeroGrad()
-
 		for _, s := range samples {
 			yHat := model.Forward(s.x)
 			model.Backward(s.x, yHat, s.y)
 		}
-
-		model.ApplyGrad(0.1, len(samples))
+		optimizer.Step(len(samples))
 	}
 
 	finalLoss := averageLoss(model, samples)
-
 	if finalLoss >= initialLoss {
 		t.Fatalf("expected loss to decrease: initial=%f final=%f", initialLoss, finalLoss)
 	}
-
 	if finalLoss > 0.35 {
 		t.Fatalf("expected final loss <= 0.35, got %f", finalLoss)
 	}
@@ -83,6 +77,7 @@ func TestMultilayerMLPTrainingReducesLoss(t *testing.T) {
 	}
 
 	model := NewMLPWithHiddenSizes(2, []int{8, 4}, 42)
+	optimizer := NewSGDOptimizer(model, 0.1)
 	initialLoss := averageLoss(model, samples)
 
 	for epoch := 0; epoch < 2000; epoch++ {
@@ -91,7 +86,7 @@ func TestMultilayerMLPTrainingReducesLoss(t *testing.T) {
 			yHat := model.Forward(s.x)
 			model.Backward(s.x, yHat, s.y)
 		}
-		model.ApplyGrad(0.1, len(samples))
+		optimizer.Step(len(samples))
 	}
 
 	finalLoss := averageLoss(model, samples)
