@@ -26,13 +26,25 @@ type EpochResult struct {
 	Duration  time.Duration
 }
 
-// TrainEpoch executa uma época em full-batch.
-func TrainEpoch(model *MLP, samples []Sample, lr float64) (EpochResult, error) {
-	return TrainEpochMiniBatch(model, samples, lr, len(samples), nil)
+// TrainEpoch executa uma época full-batch usando o otimizador SGD padrão.
+func TrainEpoch(model *MLP, samples []Sample, learningRate float64) (EpochResult, error) {
+	return TrainEpochMiniBatch(model, samples, learningRate, len(samples), nil)
 }
 
-// TrainEpochMiniBatch executa treino por mini-batch com shuffle opcional.
-func TrainEpochMiniBatch(model *MLP, samples []Sample, lr float64, batchSize int, rng *rand.Rand) (EpochResult, error) {
+// TrainEpochMiniBatch executa treino SGD por mini-batch com shuffle opcional.
+// A função preserva a API da baseline e delega a atualização para SGDOptimizer.
+func TrainEpochMiniBatch(model *MLP, samples []Sample, learningRate float64, batchSize int, rng *rand.Rand) (EpochResult, error) {
+	return TrainEpochMiniBatchWithOptimizer(NewSGDOptimizer(model, learningRate), samples, batchSize, rng)
+}
+
+// TrainEpochMiniBatchWithOptimizer executa treino com um otimizador explícito.
+// Otimizadores com estado devem ser criados uma vez e reutilizados entre épocas.
+func TrainEpochMiniBatchWithOptimizer(optimizer Optimizer, samples []Sample, batchSize int, rng *rand.Rand) (EpochResult, error) {
+	if optimizer == nil {
+		return EpochResult{}, fmt.Errorf("nil optimizer")
+	}
+
+	model := optimizer.Model()
 	if err := validateTrainingInput(model, samples); err != nil {
 		return EpochResult{}, err
 	}
@@ -42,7 +54,6 @@ func TrainEpochMiniBatch(model *MLP, samples []Sample, lr float64, batchSize int
 
 	startedAt := time.Now()
 	work := samples
-
 	if rng != nil {
 		work = append([]Sample(nil), samples...)
 		rng.Shuffle(len(work), func(i, j int) {
@@ -58,20 +69,17 @@ func TrainEpochMiniBatch(model *MLP, samples []Sample, lr float64, batchSize int
 
 		batch := work[start:end]
 		model.ZeroGrad()
-
 		for _, sample := range batch {
 			yHat := model.Forward(sample.X)
 			model.Backward(sample.X, yHat, sample.Y)
 		}
-
-		model.ApplyGrad(lr, len(batch))
+		optimizer.Step(len(batch))
 	}
 
 	result, err := Evaluate(model, samples)
 	if err != nil {
 		return EpochResult{}, err
 	}
-
 	result.Duration = time.Since(startedAt)
 	return result, nil
 }
@@ -88,7 +96,7 @@ func Evaluate(model *MLP, samples []Sample) (EpochResult, error) {
 
 	for _, sample := range samples {
 		yHat := model.Forward(sample.X)
-		loss += BinaryCrossEntropy(yHat, sample.Y)
+		loss += model.Loss(yHat, sample.Y)
 		confusion.Add(yHat, sample.Y, DefaultClassificationThreshold)
 	}
 
