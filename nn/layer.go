@@ -36,7 +36,6 @@ func NewDenseLayer(in, out int, rng *rand.Rand) DenseLayer {
 	b := make([]float64, out)
 
 	scale := math.Sqrt(2.0 / float64(in))
-
 	for i := range w {
 		w[i] = rng.NormFloat64() * scale
 	}
@@ -73,11 +72,9 @@ func (l *DenseLayer) Forward(input, output []float64) {
 	l.mustMatchOutput(output, "forward output")
 
 	copy(output, l.Biases)
-
 	for i := 0; i < l.In; i++ {
 		x := input[i]
 		base := i * l.Out
-
 		for o := 0; o < l.Out; o++ {
 			output[o] += x * l.Weights[base+o]
 		}
@@ -104,32 +101,12 @@ func (l *DenseLayer) AccumulateGrad(input []float64, deltaOut []float64) {
 	for o := 0; o < l.Out; o++ {
 		l.GradB[o] += deltaOut[o]
 	}
-
 	for i := 0; i < l.In; i++ {
 		x := input[i]
 		base := i * l.Out
-
 		for o := 0; o < l.Out; o++ {
 			l.GradW[base+o] += x * deltaOut[o]
 		}
-	}
-}
-
-// ApplyGrad aplica gradient descent aos pesos e biases.
-// Os gradientes acumulados são divididos pelo tamanho do batch para usar a média do batch.
-func (l *DenseLayer) ApplyGrad(lr float64, batchSize int) {
-	if batchSize <= 0 {
-		panic(fmt.Sprintf("invalid batch size: %d", batchSize))
-	}
-
-	scale := lr / float64(batchSize)
-
-	for i := range l.Weights {
-		l.Weights[i] -= scale * l.GradW[i]
-	}
-
-	for i := range l.Biases {
-		l.Biases[i] -= scale * l.GradB[i]
 	}
 }
 
