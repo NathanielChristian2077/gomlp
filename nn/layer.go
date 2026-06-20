@@ -71,12 +71,36 @@ func (l DenseLayer) Clone() DenseLayer {
 func (l *DenseLayer) Forward(input, output []float64) {
 	l.mustMatchInput(input, "forward input")
 	l.mustMatchOutput(output, "forward output")
+	l.forwardUnchecked(input, output)
+}
 
+func (l *DenseLayer) forwardUnchecked(input, output []float64) {
 	copy(output, l.Biases)
 
 	for i := 0; i < l.In; i++ {
 		x := input[i]
 		base := i * l.Out
+
+		for o := 0; o < l.Out; o++ {
+			output[o] += x * l.Weights[base+o]
+		}
+	}
+}
+
+// ForwardSparse calcula z = xW + b usando apenas as entradas ativas.
+// Os índices do ActiveVector devem corresponder às posições originais do vetor denso.
+func (l *DenseLayer) ForwardSparse(input ActiveVector, output []float64) {
+	input.mustMatchSize(l.In, "sparse forward input")
+	l.mustMatchOutput(output, "sparse forward output")
+	l.forwardSparseUnchecked(input, output)
+}
+
+func (l *DenseLayer) forwardSparseUnchecked(input ActiveVector, output []float64) {
+	copy(output, l.Biases)
+
+	for k, j := range input.Indices {
+		x := input.Values[k]
+		base := j * l.Out
 
 		for o := 0; o < l.Out; o++ {
 			output[o] += x * l.Weights[base+o]
@@ -107,6 +131,26 @@ func (l *DenseLayer) AccumulateGrad(input []float64, deltaOut []float64) {
 
 	for i := 0; i < l.In; i++ {
 		x := input[i]
+		base := i * l.Out
+
+		for o := 0; o < l.Out; o++ {
+			l.GradW[base+o] += x * deltaOut[o]
+		}
+	}
+}
+
+// AccumulateGradSparse acumula gradientes usando apenas entradas ativas.
+// Ele é equivalente ao gradiente denso quando as entradas inativas são exatamente zero.
+func (l *DenseLayer) AccumulateGradSparse(input ActiveVector, deltaOut []float64) {
+	input.mustMatchSize(l.In, "sparse gradient input")
+	l.mustMatchOutput(deltaOut, "sparse gradient delta")
+
+	for o := 0; o < l.Out; o++ {
+		l.GradB[o] += deltaOut[o]
+	}
+
+	for k, i := range input.Indices {
+		x := input.Values[k]
 		base := i * l.Out
 
 		for o := 0; o < l.Out; o++ {

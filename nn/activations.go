@@ -4,11 +4,41 @@ import "math"
 
 // ReLU aplica a função de ativação da camada oculta.
 // Valores negativos são zerados e valores positivos passam sem alteração.
+// Essa ativação também é o ponto que permite observar sparsity,
+// pois neurônios com saída exatamente zero podem ser ignorados na DSA exata.
 func ReLU(x float64) float64 {
 	if x > 0 {
 		return x
 	}
 	return 0
+}
+
+// ReLUToActive aplica ReLU e retorna apenas as ativações maiores que threshold.
+// Com threshold igual a zero, a representação esparsa é matematicamente equivalente
+// ao vetor denso após ReLU, apenas removendo entradas exatamente nulas.
+// Thresholds positivos são aproximados e devem ser tratados como experimento separado.
+func ReLUToActive(z []float64, threshold float64) ActiveVector {
+	active := NewActiveVector(len(z))
+	ReLUToActiveInto(z, threshold, &active)
+	return active
+}
+
+// ReLUToActiveInto reaproveita os buffers de out para evitar alocações por amostra.
+func ReLUToActiveInto(z []float64, threshold float64, out *ActiveVector) {
+	if threshold < 0 {
+		panic("activation threshold must be non-negative")
+	}
+	if out == nil {
+		panic("nil active vector output")
+	}
+
+	out.Reset(len(z))
+	for i, v := range z {
+		if v > threshold {
+			out.Indices = append(out.Indices, i)
+			out.Values = append(out.Values, v)
+		}
+	}
 }
 
 // ReLUDerivativeFromActivation calcula a derivada da ReLU usando a ativação já computada.
