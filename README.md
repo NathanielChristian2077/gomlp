@@ -16,15 +16,18 @@ A baseline não tenta competir com CNNs. Ela existe para expor, sem abstrações
 ## Estrutura
 
 ```text
-cmd/          executáveis de linha de comando
-data/         leitura, normalização e organização do dataset
-experiment/   configurações, runner, checkpoint e persistência
-metrics/      métricas, matriz de confusão e logger
-nn/           arquitetura da MLP, camadas e treino
-internal/     detalhes privados de implementação e kernels
-scripts/      automações reprodutíveis de pesquisa
-docs/         documentação organizada por escopo
+cmd/              executáveis de linha de comando
+data/             leitura, normalização e organização do dataset
+experiment/       configurações, runner, checkpoint e persistência
+metrics/          métricas, matriz de confusão e logger
+nn/               arquitetura da MLP, camadas e treino
+internal/tensor/  primitivas matemáticas manuais de matriz e operações elementares
+internal/         demais detalhes privados de implementação e kernels
+scripts/          automações reprodutíveis de pesquisa
+docs/             documentação organizada por escopo
 ```
+
+`internal/tensor` é mantido como base matemática manual do projeto. Mesmo quando a MLP usa loops especializados para a operação matriz-vetor, essas primitivas preservam a implementação explícita de produto matricial, transposição, operações elemento a elemento e aplicação de funções.
 
 Os testes unitários ficam próximos do pacote que testam, conforme a convenção de Go. Isso permite validar invariantes internos sem transformar a API pública em um vazamento de detalhes de implementação. Testes de integração, quando necessários, pertencem a `test/integration`.
 
@@ -43,7 +46,7 @@ dataset/
     dog/
 ```
 
-A configuração usada no projeto possui 500 imagens balanceadas: 300 para treino, 100 para validação e 100 para teste. As imagens são convertidas para escala de cinza, redimensionadas para 64x64 e vetorizadas em 4096 entradas.
+O dataset fornecido para o projeto é parte da distribuição de trabalho e permanece versionável. A configuração usada possui 500 imagens balanceadas: 300 para treino, 100 para validação e 100 para teste. As imagens são convertidas para escala de cinza, redimensionadas para 64x64 e vetorizadas em 4096 entradas.
 
 ## Comandos principais
 
@@ -83,6 +86,6 @@ go run ./cmd/sweep \
 
 ## Higiene de resultados
 
-`runs/`, `results/`, checkpoints, logs e datasets locais não fazem parte do código-fonte versionado. Cada execução deve registrar seus artefatos localmente ou em armazenamento de experimentos, enquanto o repositório guarda scripts, configurações, documentação e resumos curados.
+`runs/` contém artefatos transitórios de execução e permanece ignorado pelo Git. Dataset, operações matemáticas manuais e resultados curados não são descartados automaticamente: eles fazem parte da rastreabilidade acadêmica do projeto.
 
 Consulte [docs/README.md](docs/README.md) para o índice de documentação.
