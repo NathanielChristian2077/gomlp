@@ -33,20 +33,3 @@ func Sigmoid(x float64) float64 {
 	z := math.Exp(x)
 	return z / (1 + z)
 }
-
-// BinaryCrossEntropy mede o erro para classificação binária.
-// y representa o rótulo real, com 0 para gato e 1 para cachorro.
-// yHat representa a probabilidade prevista pela sigmoid.
-// O clamp evita log(0), que geraria infinito e quebraria o treino.
-func BinaryCrossEntropy(yHat, y float64) float64 {
-	const eps = 1e-12
-
-	if yHat < eps {
-		yHat = eps
-	}
-	if yHat > 1-eps {
-		yHat = 1 - eps
-	}
-
-	return -(y*math.Log(yHat) + (1-y)*math.Log(1-yHat))
-}
