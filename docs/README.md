@@ -1,19 +1,15 @@
 # Índice de documentação
 
-A documentação é organizada por escopo, não por ordem acidental de criação.
-
 ```text
 docs/
-  foundation/    baseline estável e fundamentos do projeto
-  research/      relatórios de extensões experimentais
-  optimization/  decisões e contratos da trilha GOptimize
-  development/   convenções de repositório e reprodução
+  foundation/    baseline herdada de main
+  optimization/  contratos e decisões desta branch
+  development/   convenções compartilhadas
 ```
 
-## Convenções
+## Nesta branch
 
-- Documentação fundacional acompanha `main`.
-- Documentação de DSA acompanha `proto-DSAP`.
-- Documentação de kernels, precisão e otimizadores acompanha `GOptimize`.
-- Resultados brutos, checkpoints, CSVs extensos e logs não são documentação de código e não devem ser versionados em `runs/`.
-- Resumos curados devem registrar configuração, split, seed, métrica e comando de reprodução.
+- [Adam](optimization/adam.md)
+- [Plano SIMD e float32](optimization/simd.md)
+
+Resultados brutos, checkpoints, logs e CSVs de execução permanecem fora do Git.
