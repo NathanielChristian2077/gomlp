@@ -1,5 +1,8 @@
-# Generated experiment scratch space. Curated results may live outside this directory.
+# Experimental implementation space and generated experiment outputs.
+# The clear baseline in main intentionally keeps neither under version control.
+/internal/
 /runs/
+/results/
 
 # Python tooling
 __pycache__/
