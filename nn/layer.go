@@ -110,6 +110,18 @@ func (l *DenseLayer) AccumulateGrad(input []float64, deltaOut []float64) {
 	}
 }
 
+// ApplyGrad preserves the original layer-level API for small manual experiments.
+// New training code should use SGDOptimizer or another Optimizer through training.go.
+func (l *DenseLayer) ApplyGrad(learningRate float64, batchSize int) {
+	if learningRate <= 0 {
+		panic(fmt.Sprintf("invalid SGD learning rate: %g", learningRate))
+	}
+	if batchSize <= 0 {
+		panic(fmt.Sprintf("invalid batch size: %d", batchSize))
+	}
+	applySGDToLayer(l, learningRate, batchSize)
+}
+
 func (l *DenseLayer) mustMatchInput(values []float64, name string) {
 	if len(values) != l.In {
 		panic(fmt.Sprintf("invalid %s length: expected %d, got %d", name, l.In, len(values)))
