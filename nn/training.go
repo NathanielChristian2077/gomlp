@@ -31,13 +31,32 @@ func TrainEpoch(model *MLP, samples []Sample, lr float64) (EpochResult, error) {
 	return TrainEpochMiniBatch(model, samples, lr, len(samples), nil)
 }
 
-// TrainEpochMiniBatch executa treino por mini-batch com shuffle opcional.
+// TrainEpochMiniBatch executa treino por mini-batch com SGD e shuffle opcional.
 func TrainEpochMiniBatch(model *MLP, samples []Sample, lr float64, batchSize int, rng *rand.Rand) (EpochResult, error) {
+	return trainEpochMiniBatch(model, samples, batchSize, rng, func(actualBatchSize int) {
+		model.ApplyGrad(lr, actualBatchSize)
+	})
+}
+
+// TrainEpochMiniBatchWithOptimizer executa treino usando um otimizador explícito.
+// Otimizadores com estado, como Adam, devem ser criados uma vez e reutilizados entre épocas.
+func TrainEpochMiniBatchWithOptimizer(optimizer Optimizer, samples []Sample, batchSize int, rng *rand.Rand) (EpochResult, error) {
+	if optimizer == nil {
+		return EpochResult{}, fmt.Errorf("nil optimizer")
+	}
+
+	return trainEpochMiniBatch(optimizer.Model(), samples, batchSize, rng, optimizer.Step)
+}
+
+func trainEpochMiniBatch(model *MLP, samples []Sample, batchSize int, rng *rand.Rand, step func(batchSize int)) (EpochResult, error) {
 	if err := validateTrainingInput(model, samples); err != nil {
 		return EpochResult{}, err
 	}
 	if batchSize <= 0 {
 		return EpochResult{}, fmt.Errorf("invalid batch size: %d", batchSize)
+	}
+	if step == nil {
+		return EpochResult{}, fmt.Errorf("nil optimizer step")
 	}
 
 	startedAt := time.Now()
@@ -64,7 +83,7 @@ func TrainEpochMiniBatch(model *MLP, samples []Sample, lr float64, batchSize int
 			model.Backward(sample.X, yHat, sample.Y)
 		}
 
-		model.ApplyGrad(lr, len(batch))
+		step(len(batch))
 	}
 
 	result, err := Evaluate(model, samples)
