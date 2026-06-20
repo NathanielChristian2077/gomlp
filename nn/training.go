@@ -34,6 +34,12 @@ func TrainEpoch(model *MLP, samples []Sample, learningRate float64) (EpochResult
 // TrainEpochMiniBatch executa treino SGD por mini-batch com shuffle opcional.
 // A função preserva a API da baseline e delega a atualização para SGDOptimizer.
 func TrainEpochMiniBatch(model *MLP, samples []Sample, learningRate float64, batchSize int, rng *rand.Rand) (EpochResult, error) {
+	if err := validateTrainingInput(model, samples); err != nil {
+		return EpochResult{}, err
+	}
+	if learningRate <= 0 {
+		return EpochResult{}, fmt.Errorf("invalid SGD learning rate: %g", learningRate)
+	}
 	return TrainEpochMiniBatchWithOptimizer(NewSGDOptimizer(model, learningRate), samples, batchSize, rng)
 }
 
