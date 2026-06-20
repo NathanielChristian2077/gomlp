@@ -111,23 +111,29 @@ func (m *MLP) Forward(x []float64) float64 {
 
 	for layerIndex := range m.Hidden {
 		m.Hidden[layerIndex].Forward(input, m.HiddenZ[layerIndex])
-
 		for i, z := range m.HiddenZ[layerIndex] {
 			m.HiddenA[layerIndex][i] = ReLU(z)
 		}
-
 		input = m.HiddenA[layerIndex]
 	}
 
 	m.Output.Forward(input, m.OutputZ)
-
 	return Sigmoid(m.OutputZ[0])
 }
 
+// Loss calcula a loss padrão da baseline para uma predição sigmoid binária.
+func (m *MLP) Loss(prediction, target float64) float64 {
+	return DefaultSigmoidBinaryCrossEntropy().Value(prediction, target)
+}
+
+// OutputDelta calcula o delta da camada de saída para a loss padrão da baseline.
+func (m *MLP) OutputDelta(prediction, target float64) float64 {
+	return DefaultSigmoidBinaryCrossEntropy().OutputDelta(prediction, target)
+}
+
 // Backward acumula os gradientes de uma amostra.
-// Com sigmoid + Binary Cross Entropy, o delta da saída é yHat - y.
 func (m *MLP) Backward(x []float64, yHat, y float64) {
-	m.DeltaOutput[0] = yHat - y
+	m.DeltaOutput[0] = m.OutputDelta(yHat, y)
 
 	lastHidden := len(m.Hidden) - 1
 	m.Output.AccumulateGrad(m.HiddenA[lastHidden], m.DeltaOutput)
@@ -158,7 +164,6 @@ func (m *MLP) Backward(x []float64, yHat, y float64) {
 		} else {
 			previousActivation = m.HiddenA[layerIndex-1]
 		}
-
 		m.Hidden[layerIndex].AccumulateGrad(previousActivation, m.DeltaHidden[layerIndex])
 	}
 }
@@ -169,14 +174,6 @@ func (m *MLP) ZeroGrad() {
 		m.Hidden[i].ZeroGrad()
 	}
 	m.Output.ZeroGrad()
-}
-
-// ApplyGrad aplica a atualização de pesos após o batch.
-func (m *MLP) ApplyGrad(lr float64, batchSize int) {
-	for i := range m.Hidden {
-		m.Hidden[i].ApplyGrad(lr, batchSize)
-	}
-	m.Output.ApplyGrad(lr, batchSize)
 }
 
 func cloneDenseLayerSlice(layers []DenseLayer) []DenseLayer {
