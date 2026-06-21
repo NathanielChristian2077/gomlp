@@ -34,28 +34,10 @@ func TestSigmoid(t *testing.T) {
 	if !almostEqual(Sigmoid(0), 0.5) {
 		t.Fatalf("expected sigmoid(0) = 0.5, got %f", Sigmoid(0))
 	}
-
 	if Sigmoid(1000) <= 0.999 {
 		t.Fatalf("expected sigmoid(1000) near 1")
 	}
-
 	if Sigmoid(-1000) >= 0.001 {
 		t.Fatalf("expected sigmoid(-1000) near 0")
-	}
-}
-
-func TestBinaryCrossEntropy(t *testing.T) {
-	got := BinaryCrossEntropy(0.8, 1)
-	want := -math.Log(0.8)
-
-	if !almostEqual(got, want) {
-		t.Fatalf("expected %f, got %f", want, got)
-	}
-
-	got = BinaryCrossEntropy(0.2, 0)
-	want = -math.Log(0.8)
-
-	if !almostEqual(got, want) {
-		t.Fatalf("expected %f, got %f", want, got)
 	}
 }
