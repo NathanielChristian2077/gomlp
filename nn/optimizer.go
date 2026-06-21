@@ -9,9 +9,6 @@ type Optimizer interface {
 	Step(batchSize int)
 }
 
-// BatchOptimizer is kept as an alias for the first GOptimize API.
-type BatchOptimizer = Optimizer
-
 // SGDOptimizer implements mini-batch stochastic gradient descent.
 type SGDOptimizer struct {
 	model        *MLP
