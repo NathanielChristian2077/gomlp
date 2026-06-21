@@ -6,17 +6,14 @@ import (
 	"strings"
 )
 
-// OutputHead define como os logits da camada de saída viram classe/probabilidade.
+// OutputHead defines how output logits become probabilities and classes.
 type OutputHead string
 
 const (
-	// OutputHeadSigmoid1 usa um logit e sigmoid para modelar P(dog).
 	OutputHeadSigmoid1 OutputHead = "sigmoid1"
-	// OutputHeadSoftmax2 usa dois logits, cat e dog, com cross-entropy/argmax.
 	OutputHeadSoftmax2 OutputHead = "softmax2"
 )
 
-// NormalizeOutputHead valida e normaliza o modo da cabeça de saída.
 func NormalizeOutputHead(raw string) (OutputHead, error) {
 	switch OutputHead(strings.ToLower(strings.TrimSpace(raw))) {
 	case "", OutputHeadSigmoid1:
@@ -93,37 +90,14 @@ func (h OutputHead) PredictClass(logits []float64) int {
 	}
 }
 
+// LossFromLogits delegates loss mathematics to loss.go.
 func (h OutputHead) LossFromLogits(logits []float64, y float64) float64 {
-	switch normalizeModelOutputHead(h) {
-	case OutputHeadSigmoid1:
-		return BinaryCrossEntropy(h.PositiveProbability(logits), y)
-	case OutputHeadSoftmax2:
-		return CrossEntropyFromLogits(logits, int(y))
-	default:
-		panic(fmt.Sprintf("unknown output head: %q", h))
-	}
+	return LossForOutputHead(h).LossFromLogits(logits, y)
 }
 
+// FillOutputDelta delegates dL/dlogits to loss.go.
 func (h OutputHead) FillOutputDelta(logits []float64, y float64, delta []float64) {
-	switch normalizeModelOutputHead(h) {
-	case OutputHeadSigmoid1:
-		if len(delta) != 1 {
-			panic(fmt.Sprintf("sigmoid1 expects 1 delta, got %d", len(delta)))
-		}
-		delta[0] = Sigmoid(logits[0]) - y
-	case OutputHeadSoftmax2:
-		if len(delta) != 2 {
-			panic(fmt.Sprintf("softmax2 expects 2 deltas, got %d", len(delta)))
-		}
-		SoftmaxInto(logits, delta)
-		target := int(y)
-		if target != 0 && target != 1 {
-			panic(fmt.Sprintf("invalid softmax2 target: %d", target))
-		}
-		delta[target] -= 1
-	default:
-		panic(fmt.Sprintf("unknown output head: %q", h))
-	}
+	LossForOutputHead(h).FillOutputDelta(logits, y, delta)
 }
 
 func SoftmaxInto(logits []float64, out []float64) {
@@ -135,15 +109,15 @@ func SoftmaxInto(logits []float64, out []float64) {
 	}
 
 	maxLogit := logits[0]
-	for _, v := range logits[1:] {
-		if v > maxLogit {
-			maxLogit = v
+	for _, value := range logits[1:] {
+		if value > maxLogit {
+			maxLogit = value
 		}
 	}
 
 	sum := 0.0
-	for i, v := range logits {
-		exp := math.Exp(v - maxLogit)
+	for i, value := range logits {
+		exp := math.Exp(value - maxLogit)
 		out[i] = exp
 		sum += exp
 	}
@@ -160,33 +134,15 @@ func SoftmaxClassProbability(logits []float64, classIndex int) float64 {
 		panic(fmt.Sprintf("invalid softmax class index %d for %d logits", classIndex, len(logits)))
 	}
 	maxLogit := logits[0]
-	for _, v := range logits[1:] {
-		if v > maxLogit {
-			maxLogit = v
+	for _, value := range logits[1:] {
+		if value > maxLogit {
+			maxLogit = value
 		}
 	}
 	numerator := math.Exp(logits[classIndex] - maxLogit)
 	denominator := 0.0
-	for _, v := range logits {
-		denominator += math.Exp(v - maxLogit)
+	for _, value := range logits {
+		denominator += math.Exp(value - maxLogit)
 	}
 	return numerator / denominator
-}
-
-func CrossEntropyFromLogits(logits []float64, target int) float64 {
-	if target < 0 || target >= len(logits) {
-		panic(fmt.Sprintf("invalid cross-entropy target %d for %d logits", target, len(logits)))
-	}
-	maxLogit := logits[0]
-	for _, v := range logits[1:] {
-		if v > maxLogit {
-			maxLogit = v
-		}
-	}
-	sumExp := 0.0
-	for _, v := range logits {
-		sumExp += math.Exp(v - maxLogit)
-	}
-	logSumExp := maxLogit + math.Log(sumExp)
-	return logSumExp - logits[target]
 }
