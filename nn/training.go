@@ -26,7 +26,6 @@ func TrainEpoch(model *MLP, samples []Sample, learningRate float64) (EpochResult
 	return TrainEpochMiniBatch(model, samples, learningRate, len(samples), nil)
 }
 
-// TrainEpochMiniBatch preserves the original SGD API while using SGDOptimizer internally.
 func TrainEpochMiniBatch(model *MLP, samples []Sample, learningRate float64, batchSize int, rng *rand.Rand) (EpochResult, error) {
 	if err := validateTrainingInput(model, samples); err != nil {
 		return EpochResult{}, err
@@ -37,7 +36,6 @@ func TrainEpochMiniBatch(model *MLP, samples []Sample, learningRate float64, bat
 	return TrainEpochMiniBatchWithOptimizer(NewSGDOptimizer(model, learningRate), samples, batchSize, rng)
 }
 
-// TrainEpochMiniBatchWithOptimizer supports stateful optimizers without changing DSA semantics.
 func TrainEpochMiniBatchWithOptimizer(optimizer Optimizer, samples []Sample, batchSize int, rng *rand.Rand) (EpochResult, error) {
 	if optimizer == nil {
 		return EpochResult{}, fmt.Errorf("nil optimizer")
@@ -62,7 +60,6 @@ func TrainEpochMiniBatchWithOptimizer(optimizer Optimizer, samples []Sample, bat
 		if end > len(work) {
 			end = len(work)
 		}
-
 		batch := work[start:end]
 		model.ZeroGrad()
 		for _, sample := range batch {
@@ -90,7 +87,7 @@ func Evaluate(model *MLP, samples []Sample) (EpochResult, error) {
 	confusion := metrics.NewConfusionMatrix()
 	for _, sample := range samples {
 		yHat := model.Forward(sample.X)
-		loss += DefaultLoss().Value(yHat, sample.Y)
+		loss += model.Loss(yHat, sample.Y)
 		confusion.Add(yHat, sample.Y, DefaultClassificationThreshold)
 	}
 
